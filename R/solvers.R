@@ -1188,7 +1188,71 @@ projectPLIER = function(PLIERres, newdata, scale=1) {
   return(B)
 }
 
+#' Estimate number of principal components via elbow or permutation method
+#'
+#' @param data    Either a matrix (e.g. z-scored data) or an SVD result (list with $d).
+#' @param method  One of "elbow" (fast) or "permutation" (slower, but less heuristic).
+#' @param B       Number of permutations (for method = "permutation").
+#' @param seed    Seed for reproducibility.
+#' @return        Estimated number of PCs.
+#' @export
+num.pc <- function(data, method = "elbow", B = 20, seed = NULL) {
+  method <- match.arg(method, c("elbow", "permutation"))
+  if (!is.null(seed)) set.seed(seed)
 
+  # If raw matrix, compute SVD first
+  if (!inherits(data, "list") || is.null(data[["d"]])) {
+    message("Computing svd")
+    n <- ncol(data); m <- nrow(data)
+    # row-normalize
+    row_sds <- apply(data, 1, sd); row_sds[row_sds == 0] <- 1
+    data <- sweep(data, 1, row_sds, "/")
+    k <- if (n < 500) n else max(200, floor(n / 4))
+    if (k == n) {
+      uu <- svd(data)
+    } else {
+      set.seed(123456)
+      uu <- rsvd(data, k = k, q = 3)
+    }
+  } else {
+    uu <- data
+    # permutation requires raw data
+    if (method == "permutation") {
+      message("Original data is needed for permutation; switching to elbow")
+      method <- "elbow"
+    }
+    k <- length(uu$d)
+  }
+
+  if (method == "permutation") {
+    # squared singular-value proportions
+    dstat <- uu$d[1:k]^2 / sum(uu$d[1:k]^2)
+    dstat0 <- matrix(0, nrow = B, ncol = k)
+    for (i in seq_len(B)) {
+      dat0 <- t(apply(data, 1, sample))
+      if (k == ncol(data)) {
+        uu0 <- svd(dat0)
+      } else {
+        set.seed(123456)
+        uu0 <- rsvd(dat0, k = k, q = 3)
+      }
+      dstat0[i, ] <- uu0$d[1:k]^2 / sum(uu0$d[1:k]^2)
+    }
+    psv <- sapply(seq_len(k), function(i) mean(dstat0[, i] >= dstat[i]))
+    psv <- cummax(psv)  # enforce monotonicity
+    nsv <- sum(psv <= 0.1)
+  } else {
+    # elbow method: look at second-differences of singular values
+    xraw <- abs(diff(diff(uu$d)))
+    # a bit of smoothing
+    twiceit <- function(x) smooth(x, twiceit = TRUE)
+    x <- twiceit(xraw)
+    cutoff <- quantile(x, 0.5)
+    nsv <- which(x <= cutoff)[1] + 1
+  }
+
+  nsv
+}
 
 
 
