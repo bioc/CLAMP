@@ -1,38 +1,51 @@
 # PLIER2 <img src="man/figures/plier2.png" width="121px" height="140px" align="right" style="padding-left:10px;background-color:white;" />
 
-**PLIER2 (Pathway-Level Information ExtractoR 2)** is a scalable framework for extracting biologically meaningful latent variables from gene expression data using prior knowledge of gene sets. It builds upon and extends the original [PLIER](https://github.com/wgmao/PLIER) method, offering improvements in performance and reproducibility for large-scale datasets like GTEx and ARCHS4.
+<!-- badges: start -->
+[![GitHub issues](https://img.shields.io/github/issues/mchikina/PLIER2)](https://github.com/mchikina/mchikina/PLIER2)
+[![Lifecycle: stable](https://img.shields.io/badge/lifecycle-stable-green.svg)](https://lifecycle.r-lib.org/articles/stages.html#stable)
+[![R-CMD-check-bioc](https://github.com/mchikina/PLIER2/workflows/R-CMD-check-bioc/badge.svg)](https://github.com/mchikina/PLIER2/actions)
+<!-- badges: end -->
 
-The goal of PLIER2 is to ...
+## Bioconductor release status
+
+|      Branch      |    R CMD check   | Last updated |
+|:----------------:|:----------------:|:------------:|
+| [_devel_](http://bioconductor.org/packages/devel/bioc/html/PLIER2.html) | [![Bioconductor-devel Build Status](http://bioconductor.org/shields/build/devel/bioc/PLIER2.svg)](http://bioconductor.org/checkResults/devel/bioc-LATEST/PLIER2) | ![](http://bioconductor.org/shields/lastcommit/devel/bioc/PLIER2.svg) |
+| [_release_](http://bioconductor.org/packages/release/bioc/html/PLIER2.html) | [![Bioconductor-release Build Status](http://bioconductor.org/shields/build/release/bioc/PLIER2.svg)](http://bioconductor.org/checkResults/release/bioc-LATEST/PLIER2) | ![](http://bioconductor.org/shields/lastcommit/release/bioc/PLIER2.svg) |
+
+The goal of PLIER2 is to provide an easy-to-use package to extract interpretable latent variables from large transcriptomic datasets using biological priors.
 
 ## Installation
 
-You can install the development version of PLIER2 like so:
+You can install the latest release of `PLIER2` from Bioconductor:
+
+    if (!requireNamespace("BiocManager", quietly = TRUE))
+        install.packages("BiocManager")
+    
+    BiocManager::install("PLIER2")
+
+
+If you want to test the development version, you can install it from the github repository:
+
+    BiocManager::install("mchikina/PLIER2")
+
+Now you can load the package using `library(PLIER2)`.
+
+## Basic usage
+
+For detailed instructions on how to use PLIER2, please see the [vignette](https://mchikina.github.io/PLIER2/articles/PLIER2.html).
 
 ``` r
-# FILL THIS IN! HOW CAN PEOPLE INSTALL YOUR DEV PACKAGE?
-```
-
-## Example
-
-This is a basic example which shows you how to solve a common problem:
-
-```{r example}
 library(PLIER2)
-## basic example code
 ```
 
-What is special about using `README.Rmd` instead of just `README.md`? You can include R chunks like so:
+``` r
 
-```{r cars}
-summary(cars)
 ```
 
-You'll still need to render `README.Rmd` regularly, to keep `README.md` up-to-date. `devtools::build_readme()` is handy for this.
+## Code of Conduct
 
-You can also embed plots, for example:
-
-```{r pressure, echo = FALSE}
-plot(pressure)
-```
-
-In that case, don't forget to commit and push the resulting figure files, so they display on GitHub and CRAN.
+Please note that the PLIER2 project is released with a [Contributor
+Code of
+Conduct](https://contributor-covenant.org/version/2/0/CODE_OF_CONDUCT.html).
+By contributing to this project, you agree to abide by its terms.
