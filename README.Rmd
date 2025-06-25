@@ -1,22 +1,6 @@
----
-output: github_document
----
+# PLIER2 <img src="man/figures/plier2.png" width="121px" height="140px" align="right" style="padding-left:10px;background-color:white;" />
 
-<!-- README.md is generated from README.Rmd. Please edit that file -->
-
-```{r, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  fig.path = "man/figures/README-",
-  out.width = "100%"
-)
-```
-
-# PLIER2
-
-<!-- badges: start -->
-<!-- badges: end -->
+**PLIER2 (Pathway-Level Information ExtractoR 2)** is a scalable framework for extracting biologically meaningful latent variables from gene expression data using prior knowledge of gene sets. It builds upon and extends the original [PLIER](https://github.com/wgmao/PLIER) method, offering improvements in performance and reproducibility for large-scale datasets like GTEx and ARCHS4.
 
 The goal of PLIER2 is to ...
 
