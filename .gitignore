@@ -12,3 +12,4 @@ vignettes/*
 !vignettes/*Rnw
 !vignettes/*pdf
 !vignettes/*html
+data/*

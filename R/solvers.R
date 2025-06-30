@@ -33,11 +33,16 @@ BH<-function(p){p.adjust(p, method="BH")}
 #' @param B A numeric matrix of the same dimensions as \code{A}.
 #' @return A numeric vector of correlations, one per row.
 row_cor <- function(A, B) {
-  A_centered <- A - rowMeans(A)
-  B_centered <- B - rowMeans(B)
-  numerator <- rowSums(A_centered * B_centered)
-  denom <- sqrt(rowSums(A_centered^2) * rowSums(B_centered^2))
-  numerator / denom
+  A_mat <- as.matrix(A)
+  B_mat <- as.matrix(B)
+  if (!all(dim(A_mat) == dim(B_mat))) {
+    stop("row_cor(): dimensions of A and B must match")
+  }
+  A_centered <- A_mat - rowMeans(A_mat)
+  B_centered <- B_mat - rowMeans(B_mat)
+  num <- rowSums(A_centered * B_centered)
+  den <- sqrt(rowSums(A_centered^2) * rowSums(B_centered^2))
+  num / den
 }
 
 #' Matrix multiplication with support for FBM objects
@@ -539,7 +544,6 @@ PLIERbase=function(Y, k,svdres=NULL,  L1=NULL, L2=NULL,
   is_fbm <- inherits(Y, "FBM")
   is_sparse <- inherits(Y, "dgCMatrix")
 
-
   ng=nrow(Y)
   ns=ncol(Y)
 
@@ -700,22 +704,6 @@ PLIERbase=function(Y, k,svdres=NULL,  L1=NULL, L2=NULL,
   return(list(B=B, Z=Z, Zraw=Zraw, L1=L1, L2=L2))
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #' Full PLIER model with prior information and cross-validation
 #'
 #' Runs the full PLIER (Pathway-Level Information ExtractoR) model using a gene expression matrix
@@ -783,16 +771,11 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
 
   pathwaySelection=match.arg(pathwaySelection, c("complete", "fast"))
 
-
-
-
   message("**PLIER v2 **")
-
 
   # Detect matrix type
   is_fbm <- inherits(Y, "FBM")
   is_sparse <- inherits(Y, "dgCMatrix")
-
 
   if(nrow(priorMat)!=nrow(Y) || !all(rownames(priorMat)==rownames(data))){
     if(!allGenes){
@@ -876,7 +859,6 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
       message("k is set to ", k)
     }
 
-
     message("Running PLIERbase")
     if(is.null(plier.base.result)){
       plier.base.result=PLIERbase(Y, k=k)
@@ -913,11 +895,6 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
 
   oldB=B
 
-
-
-
-
-
   if(!is.null(rseed)){
     message("using random start")
     set.seed(rseed)
@@ -925,20 +902,10 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
     Z=apply(Z,2,sample)
   }
 
-
-
-
-
-
   U=matrix(0,nrow=ncol(C), ncol=k)
 
 
   round2=function(x){signif(x,4)}
-
-
-
-
-
 
   iter.full.start=iter.full=u.iter
 
@@ -959,16 +926,11 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
   }
   Zraw=Z
   Z2=matrix(0, nrow=nrow(Z), ncol=ncol(Z))
+  
   for ( iter in 1:max.iter){
-
-
-
-
-
+    
+    B <- as.matrix(B)
     if(iter>=iter.full.start){
-
-
-
 
       if(iter>=iter.full&&num.U.updates<max.U.updates& iter %% 2 ==1 ){
 
@@ -1000,30 +962,16 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
 
           Z2=L1*C%*%U
 
-
       }
-
-
+      
       curfrac=(npos<-sum(apply(U,2,max)>0))/k
       #Z1=Y%*%t(B)
       Z1=mat_mult(Y, t(B))
 
-
-
-
-
      # ii=which(Z2>0)
      # ratio=median(Z2[ii]/abs(Z1[ii]))
 
-
-
-
-
-
         Z=(Z1+Z2)%*%solve(tcrossprod(B)+L1k)
-
-
-
 
     }
 
@@ -1031,8 +979,6 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
 
       Z=mat_mult(Y,t(B))%*%solve(tcrossprod(B)+L1k)
     }
-
-
 
     if(adaptive.p>0){
 
@@ -1051,11 +997,7 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
       Zraw=Z
     }
 
-
-
-
     oldB=B
-
 
     if(is_fbm){
       ZYt=big_cprodMat(Y, as.matrix(Z))
@@ -1070,20 +1012,12 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
     Bdiff=sum((B-oldB)^2)/sum(B^2)
     minCor=min(row_cor(B, oldB))
 
-
-
     BdiffTrace=c(BdiffTrace, Bdiff)
-
 
     if (trace) {
       cat(sprintf("\rProgress %d / %d | Bdiff=%.6f", iter, max.iter, Bdiff))
       flush.console()
     }
-
-
-
-
-
 
     if(iter>52&&Bdiff>BdiffTrace[iter-50]){
       BdiffCount=BdiffCount+1
@@ -1115,6 +1049,8 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
       out$Z[out$Z<0]=0
     }
     message("crossValidation")
+    priorMat_m   <- as.matrix(priorMat)
+    priorMatCV_m <- as.matrix(priorMatCV)
     outAUC=crossVal(out, priorMat, priorMatCV)
     out$Z=Z
     out$Uauc=outAUC$Uauc
@@ -1122,7 +1058,6 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
     out$summary=outAUC$summary
     out$priorMatCV=priorMatCV
     out$priorMat=priorMat
-
     out$withPrior=which(colSums(out$U)>0)
 
     tt=apply(out$Uauc,2,max)
