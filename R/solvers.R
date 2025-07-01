@@ -307,7 +307,7 @@ solveU=function(Z,  Chat=NULL, priorMat, penalty.factor,pathwaySelection="fast",
     colnames(U)=paste("LV", 1:ncol(U))
 
 
-
+    U <- as.matrix(U)
 
   return(list(U = U))
 
@@ -770,7 +770,9 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
   getT=function(x){-quantile(x[x<0], adaptive.p)}
 
   pathwaySelection=match.arg(pathwaySelection, c("complete", "fast"))
-
+  
+  priorMat <- as.matrix(priorMat)
+  
   message("**PLIER v2 **")
 
   # Detect matrix type
@@ -804,9 +806,7 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
     message(paste("Removed", length(iibad), "pathways with too few genes"))
   }
   if(doCrossval){
-
-
-    priorMatCV=priorMat
+    priorMatCV <- as.matrix(priorMat)
     if(!is.null(seed))
       set.seed(seed)
     for(j in 1:ncol(priorMatCV)){
