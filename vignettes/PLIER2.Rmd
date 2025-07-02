@@ -1,0 +1,445 @@
+---
+title: "Analyzing human whole blood RNA-Seq data with PLIER2"
+author: "Marc Subirana-Granés and Maria Chikina"
+package: PLIER2
+output: 
+  BiocStyle::html_document:
+    fig_width: 7
+    fig_height: 5
+vignette: >
+  %\VignetteIndexEntry{Analyzing human whole blood RNA-Seq data with PLIER2}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+    collapse = TRUE,
+    comment = "#>",
+    eval = TRUE,
+    warning = FALSE,
+    message = FALSE,
+    fig.align = "center",
+    out.width = "80%"
+)
+
+library(dplyr)
+library(PLIER2)
+library(rsvd)
+library(glmnet)
+library(Matrix)
+library(hdf5r)
+library(data.table)
+library(bigstatsr)
+library(here)
+library(rsvd)
+library(Matrix)
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+```
+
+```{r logo, echo=FALSE, eval=TRUE, out.width='10%'}
+knitr::include_graphics("../man/figures/plier2.png", dpi = 800)
+```
+
+# Introduction
+
+The **PLIER2** package provides a two-stage framework to extract interpretable latent variables from high-dimensional transcriptomic data. It combines a standard matrix decomposition (PLIERbase) with pathway-guided factor refinement (PLIERfull), enabling:
+
+1. **Dimensionality reduction** of gene expression matrices  
+2. **Incorporation of prior knowledge** (e.g., Gene Ontology or MSigDB)  
+3. **Cross-validation** to select robust latent variables  
+
+This vignette demonstrates three common use cases—small in-memory data, large HDF5 datasets with file-backed matrices, and tabular count files—illustrating how to preprocess, model, and interpret results with PLIER2.
+
+## Overview of the package
+
+```{r umi4cats-scheme, echo=FALSE, eval=TRUE, fig.cap="Overview of the different functions included in the PLIER2 package."}
+knitr::include_graphics("figures/scheme.png", dpi = 400)
+```
+
+# Quick Start
+
+We provide three self-contained examples:
+
+1. **Data-frame example (whole blood):**  
+   A small dataset loaded entirely into memory. Shows basic preprocessing, z-scoring, and running PLIER2 without on-disk storage.  
+
+2. **HDF5 example (Alzheimer’s brain):**  
+   Demonstrates how to import expression from an HDF5 file, create a file-backed FBM object, and process larger datasets using the FBM interface.
+
+3. **Table example (pancreatic islets):**  
+   Illustrates reading a tab-delimited count file, mapping ENSEMBL IDs to gene symbols, aggregating counts by gene, and comparing conditions via the B matrix.
+
+Each example follows these steps:
+
+1. **Load & preprocess data** (filter by mean/variance, then z-score)  
+2. **Prepare pathway annotations** via `getGMT()` and construct the prior matrix  
+3. **Compute SVD** (in-memory or file-backed) and infer model dimension `k`  
+4. **Run PLIERbase** to initialize latent variables  
+5. **Run PLIERfull** to refine with pathway priors and obtain summary statistics  
+
+
+## Example 1: In-Memory data.frame (Whole Blood)
+
+This section uses a small whole-blood RNA-Seq dataset to illustrate the in-memory workflow. No file-backed storage is required.
+
+```{r plier2-small_example_dataframe, message=FALSE, warning=FALSE}
+## ──────────────────────────────────────────────────────────
+## Load example data
+## ──────────────────────────────────────────────────────────
+data("dataWholeBlood")    
+data("majorCellTypes")
+
+## ──────────────────────────────────────────────────────────
+## Preprocess & Z-score
+## ──────────────────────────────────────────────────────────
+preproc <- preprocessPLIER2(
+  Y = dataWholeBlood,
+  mean_cutoff = 0.5,     
+  var_cutoff = 0.1
+)
+
+# extracts the filtered matrix and its row‐stats:
+dataWholeBlood <- preproc$Y_filtered    
+rowStatsDF      <- preproc$rowStats    
+
+dataWholeBlood <- zscorePLIER2(
+  Y_filtered = dataWholeBlood,
+  rowStats = rowStatsDF
+)
+
+## ──────────────────────────────────────────────────────────
+## Prepare pathway annotations
+## ──────────────────────────────────────────────────────────
+gmtList <- list(
+  GTEx_Tissues_V8_2023 = getGMT('https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=GTEx_Tissues_V8_2023'),
+  BP = getGMT("https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=GO_Biological_Process_2025"),
+  MSigDB_Hallmark_2020 = getGMT("https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=MSigDB_Hallmark_2020")
+)
+
+pathMatAll <- gmtListToSparseMat(gmtList)
+
+matchedPathsWB <- getMatchedPathwayMat(pathMatAll, rownames(dataWholeBlood))
+
+message("Number of distinct pathways = ", length(unique(colnames(pathMatAll))))
+
+## ──────────────────────────────────────────────────────────
+## 2. Determine SVD k and compute SVD
+## ──────────────────────────────────────────────────────────
+n_genes   <- nrow(dataWholeBlood)
+n_samples <- ncol(dataWholeBlood)
+SVD_K     <- min(n_genes, n_samples) - 1
+message("Using SVD k = ", SVD_K)
+
+set.seed(1)
+dataWholeBlood.svd <- rsvd(dataWholeBlood, k = SVD_K)
+
+# Precompute Chat
+ChatWB <- getChat(matchedPathsWB)
+
+## ──────────────────────────────────────────────────────────
+## 3. Estimate k for PLIER via num.pc()
+## ──────────────────────────────────────────────────────────
+PLIER_K <- num.pc(data = dataWholeBlood)
+message("Inferred PLIERfull k = ", PLIER_K)
+
+## ──────────────────────────────────────────────────────────
+## 4. Run PLIERbase
+## ──────────────────────────────────────────────────────────
+wb.plier.base <- PLIERbase(
+  Y = dataWholeBlood,
+  k = PLIER_K,
+  svdres = dataWholeBlood.svd,
+  trace = TRUE
+)
+
+## ──────────────────────────────────────────────────────────
+## 5. Run the full PLIER model
+## ──────────────────────────────────────────────────────────
+wb.plier.full <- PLIERfull(
+  Y = dataWholeBlood,
+  priorMat = as.matrix(matchedPathsWB),
+  svdres = dataWholeBlood.svd,
+  plier.base.result = wb.plier.base,
+  Chat = ChatWB,
+  k = PLIER_K,
+  doCrossval = TRUE,
+  max.U.updates = 50,
+  trace = TRUE
+)
+```
+
+```{r}
+wb_summary <- data.frame(wb.plier.full$summary)
+
+wb_summary %>% 
+  dplyr::filter(FDR < 1e-4 & AUC > 0.7) %>% 
+  dplyr::arrange(desc(AUC))
+```
+
+## Example 2: File-Backed Matrix (Alzheimer’s Brain)
+
+Here we load an HDF5 expression file, construct a file-backed FBM, and demonstrate how PLIER2 handles larger datasets on disk.
+DOI: 10.1016/j.nbd.2017.06.008
+
+```{r plier2-small_example_fbm_full, message=FALSE, warning=FALSE}
+# ──────────────────────────────────────────────────────────
+# Load HDF5 and prepare expression matrix
+# ──────────────────────────────────────────────────────────
+alzheimers_path <- '/home/msubirana/Documents/pivlab/PLIER2/data/human_gene_v2.5_alz.h5'
+h5 <- H5File$new(alzheimers_path, mode = "r")
+expr_mat <- h5[["data/expression"]]$read()
+genes <- h5[["meta/genes/symbol"]]$read()
+samples <- h5[["meta/samples/geo_accession"]]$read()
+h5$close_all()
+
+expr_mat <- t(expr_mat)
+colnames(expr_mat) <- samples
+rownames(expr_mat) <- genes
+
+# ──────────────────────────────────────────────────────────
+# Create and populate FBM on disk
+# ──────────────────────────────────────────────────────────
+output_dir <- here("data", "alzFBM")
+dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+fbm_file <- file.path(output_dir, "FBMalz")
+
+alzFBM <- FBM(
+  nrow = nrow(expr_mat),
+  ncol = ncol(expr_mat),
+  backingfile = fbm_file,
+  create_bk = TRUE
+)
+
+block_size <- 1000
+
+n_blocks   <- ceiling(nrow(expr_mat) / block_size)
+for (i in seq_len(n_blocks)) {
+  rows <- ((i-1) * block_size + 1):min(i * block_size, nrow(expr_mat))
+  alzFBM[rows, ] <- as.matrix(expr_mat[rows, , drop = FALSE])
+}
+
+# ──────────────────────────────────────────────────────────
+# Clean, filter, and z-score FBM
+# ──────────────────────────────────────────────────────────
+preproc <- preprocessPLIER2FBM(
+  fbm = alzFBM,
+  mean_cutoff = 0.5,
+  var_cutoff = 0.1
+)
+
+fbm_filtered <- preproc$fbm_filtered
+rowStats <- preproc$rowStats
+kept <- preproc$kept_rows
+
+zscorePLIER2FBM(fbm_filtered, rowStats)
+meta_genes <- genes[kept]  
+
+# ──────────────────────────────────────────────────────────
+# Compute SVD on filtered FBM
+# ──────────────────────────────────────────────────────────
+SVD_K <- min(nrow(fbm_filtered), ncol(fbm_filtered)) - 1
+set.seed(1)
+alz_svd <- big_randomSVD(fbm_filtered, k = SVD_K)
+
+# ──────────────────────────────────────────────────────────
+# Prepare pathways and Chat matrix
+# ──────────────────────────────────────────────────────────
+gmtList <- list(
+  GTEx_Tissues_V8_2023 = getGMT('https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=GTEx_Tissues_V8_2023'),
+  BP = getGMT('https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=GO_Biological_Process_2025'),
+  MSigDB_Hallmark_2020 = getGMT('https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=MSigDB_Hallmark_2020' )
+)
+
+pathMatAll <- gmtListToSparseMat(gmtList)
+matchedPathsAz <- getMatchedPathwayMat(pathMatAll, meta_genes)
+ChatAz <- getChat(matchedPathsAz)
+
+# ──────────────────────────────────────────────────────────
+# Run PLIERbase and PLIERfull
+# ──────────────────────────────────────────────────────────
+PLIER_K  <- num.pc(list(d = alz_svd$d))
+alz_base <- PLIERbase(
+  Y = fbm_filtered,
+  k = PLIER_K,
+  svdres = alz_svd,
+  trace  = TRUE
+)
+
+alz_full <- PLIERfull(
+  Y = fbm_filtered,
+  priorMat = matchedPathsAz,
+  svdres = alz_svd,
+  plier.base.result = alz_base,
+  Chat = ChatAz,
+  k = PLIER_K,
+  doCrossval = TRUE,
+  max.U.updates = 50,
+  trace = TRUE
+)
+```
+
+```{r}
+alz_summary <- data.frame(alz_full$summary)
+
+alz_summary %>% 
+  dplyr::filter(FDR < 1e-4 & AUC > 0.7) %>% 
+  arrange(FDR)
+```
+
+## Example 3: Tab-Delimited Count File (Pancreatic Islets)
+
+In this example, we import raw count data, map ENSEMBL identifiers to gene symbols, aggregate counts, and then apply the dense (in-memory) pipeline. Finally, we compare latent-variable activities between control and diabetic donors.
+
+https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE164416
+
+```{r plier2-small_example_table, message=FALSE, warning=FALSE}
+# ──────────────────────────────────────────────────────────
+# Load count data and map to gene symbols
+# ──────────────────────────────────────────────────────────
+islet_df <- read.table(
+  here::here('/home/msubirana/Documents/pivlab/PLIER2/data/GSE164416_DP_htseq_counts.txt'),
+  header = TRUE, stringsAsFactors = FALSE
+)
+
+islet_df$symbol <- mapIds(
+  org.Hs.eg.db,
+  keys = islet_df$ensembl,
+  column = "SYMBOL",
+  keytype = "ENSEMBL",
+  multiVals = "first"
+)
+
+islet_df <- islet_df[!is.na(islet_df$symbol), ]
+
+# ──────────────────────────────────────────────────────────
+# Aggregate counts by gene symbol
+# ──────────────────────────────────────────────────────────
+setDT(islet_df)
+num_cols <- names(islet_df)[sapply(islet_df, is.numeric)]
+expr <- islet_df[, lapply(.SD, sum), by = symbol, .SDcols = num_cols]
+expr <- as.data.frame(expr)
+rownames(expr) <- expr$symbol
+expr$symbol <- NULL
+expr <- as.matrix(expr)
+
+# ──────────────────────────────────────────────────────────
+# Preprocess & Z-score (dense)
+# ──────────────────────────────────────────────────────────
+preproc <- preprocessPLIER2(
+  Y = expr,
+  mean_cutoff = 0.5,
+  var_cutoff = 0.1
+)
+
+expr_filt <- preproc$Y_filtered
+rowStats <- preproc$rowStats
+
+expr_z <- zscorePLIER2(
+  Y_filtered = expr_filt,
+  rowStats = rowStats
+)
+
+# ──────────────────────────────────────────────────────────
+# Prepare pathways and Chat matrix
+# ──────────────────────────────────────────────────────────
+gmtList <- list(
+  GTEx_Tissues_V8_2023 = getGMT('https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=GTEx_Tissues_V8_2023'),
+  Diabetes_Perturbations_GEO_2022 = getGMT('https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=Diabetes_Perturbations_GEO_2022'),
+  MSigDB_Hallmark_2020 = getGMT('https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=MSigDB_Hallmark_2020')
+)
+
+pathMatAll   <- gmtListToSparseMat(gmtList)
+matchedPaths <- getMatchedPathwayMat(pathMatAll, rownames(expr_z))
+Chat <- getChat(matchedPaths)
+# ──────────────────────────────────────────────────────────
+# Run PLIERbase and PLIERfull
+# ──────────────────────────────────────────────────────────
+base_res <- PLIERbase(
+  Y = expr_z,
+  k = num.pc(expr_z),
+  svdres = rsvd(expr_z, k = min(nrow(expr_z), ncol(expr_z)) - 1),
+  trace = TRUE
+)
+
+full_res <- PLIERfull(
+  Y = expr_z,
+  priorMat = matchedPaths,
+  svdres = base_res$svdres,
+  plier.base.result = base_res,
+  Chat = Chat,
+  k = num.pc(expr_z),
+  doCrossval = TRUE,
+  trace = TRUE
+)
+
+```
+
+```{r}
+islets_summary <- full_res$summary
+
+islets_summary_sig <- islets_summary %>% 
+  dplyr::rename(LV='LV index') %>% 
+  dplyr::mutate(LV=paste0('LV', LV)) %>% 
+  dplyr::filter(FDR<1e-4 & AUC > 0.7)
+
+islets_summary_sig %>% dplyr::arrange(desc(AUC))
+```
+
+```{r}
+iselt_metadata <- read.csv('/home/msubirana/Documents/pivlab/PLIER2/data/islets_metadata.csv', header = TRUE)
+```
+
+```{r}
+B_df <- as.data.frame(as.matrix(full_res$B)) %>%
+  dplyr::mutate(LV = rownames(.))
+
+sample_types <- iselt_metadata %>%
+  dplyr::mutate(
+    id   = as.character(id),
+    type = as.character(type)
+  )
+
+sample_cols  <- setdiff(colnames(B_df), "LV")
+nd_cols      <- intersect(sample_cols, sample_types$id[sample_types$type == "ND"])
+other_cols   <- intersect(sample_cols, sample_types$id[sample_types$type != "ND"])
+
+if (length(nd_cols) == 0 || length(other_cols) == 0) {
+  stop("No matching ND or non-ND sample columns found")
+}
+
+lv_stats_all_vs_nd <- B_df %>%
+  dplyr::rowwise() %>%
+  dplyr::mutate(
+    Mean_ND   = mean(dplyr::c_across(dplyr::all_of(nd_cols))),
+    Mean_All  = mean(dplyr::c_across(dplyr::all_of(other_cols))),
+    Mean_Diff = Mean_All - Mean_ND,
+    P_Value   = stats::wilcox.test(
+      dplyr::c_across(dplyr::all_of(nd_cols)),
+      dplyr::c_across(dplyr::all_of(other_cols))
+    )$p.value
+  ) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(FDR = stats::p.adjust(P_Value, method = "fdr")) %>%
+  dplyr::select(LV, Mean_ND, Mean_All, Mean_Diff, P_Value, FDR) %>%
+  dplyr::arrange(FDR)
+
+sig_lv_all_vs_nd <- lv_stats_all_vs_nd %>%
+  dplyr::filter(FDR < 0.05)
+
+sig_pathway <- islets_summary %>% 
+  dplyr::rename(LV='LV index') %>% 
+  dplyr::mutate(LV=paste0('LV', LV)) %>% 
+  dplyr::filter(FDR<1e-4 & AUC > 0.7) %>% 
+  dplyr::filter(LV %in% sig_lv_all_vs_nd$LV) %>% 
+  dplyr::arrange(FDR)
+
+sig_pathway
+```
+
+# Session Information
+
+```{r session-info}
+sessionInfo()
+```
