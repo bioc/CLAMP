@@ -927,9 +927,10 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
   Zraw=Z
   Z2=matrix(0, nrow=nrow(Z), ncol=ncol(Z))
   
+  B <- as.matrix(B)
+
   for ( iter in 1:max.iter){
     
-    B <- as.matrix(B)
     if(iter>=iter.full.start){
 
       if(iter>=iter.full&&num.U.updates<max.U.updates& iter %% 2 ==1 ){
@@ -1123,72 +1124,93 @@ projectPLIER = function(PLIERres, newdata, scale=1) {
   return(B)
 }
 
+## Refactored PC estimation functions
+
+#' Run elbow method to estimate number of PCs
+#'
+#' @param d Vector of singular values
+#' @return Estimated number of PCs via elbow
+run_elbow <- function(d) {
+  # compute second differences
+  x_raw <- abs(diff(diff(d)))
+  # smoothing helper
+  twiceit <- function(x, twiceit = TRUE) smooth(x, twiceit = TRUE)
+  x_smooth <- twiceit(x_raw)
+  cutoff <- quantile(x_smooth, 0.5)
+  # first index below cutoff plus one for PC count
+  which(x_smooth <= cutoff)[1] + 1
+}
+
+#' Run permutation method to estimate number of PCs
+#'
+#' @param data Raw data matrix (row-normalized)
+#' @param d Vector of singular values
+#' @param B Number of permutations
+#' @return Estimated number of PCs via permutation test
+run_permutation <- function(data, d, B = 20) {
+  k <- length(d)
+  # observed proportions
+  obs_prop <- d^2 / sum(d^2)
+  # permuted proportions matrix
+  perm_mat <- matrix(0, nrow = B, ncol = k)
+  for (i in seq_len(B)) {
+    dat0 <- t(apply(data, 1, sample))
+    if (ncol(dat0) == k) {
+      uu0 <- svd(dat0)
+    } else {
+      set.seed(123456)
+      uu0 <- rsvd(dat0, k = k, q = 3)
+    }
+    perm_mat[i, ] <- uu0$d[1:k]^2 / sum(uu0$d[1:k]^2)
+  }
+  p_vals <- apply(perm_mat >= obs_prop, 2, mean)
+  p_vals <- cummax(p_vals)
+  sum(p_vals <= 0.1)
+}
+
 #' Estimate number of principal components via elbow or permutation method
 #'
 #' @param data    Either a matrix (e.g. z-scored data) or an SVD result (list with $d).
-#' @param method  One of "elbow" (fast) or "permutation" (slower, but less heuristic).
+#' @param method  One of "elbow" (fast) or "permutation" (slower).
 #' @param B       Number of permutations (for method = "permutation").
 #' @param seed    Seed for reproducibility.
 #' @return        Estimated number of PCs.
 #' @export
-num.pc <- function(data, method = "elbow", B = 20, seed = NULL) {
-  method <- match.arg(method, c("elbow", "permutation"))
+num.pc <- function(data, method = c("elbow", "permutation"), B = 20, seed = NULL) {
+  method <- match.arg(method)
   if (!is.null(seed)) set.seed(seed)
 
-  # If raw matrix, compute SVD first
-  if (!inherits(data, "list") || is.null(data[["d"]])) {
-    message("Computing svd")
-    n <- ncol(data); m <- nrow(data)
+  # Prepare SVD result
+  if (!inherits(data, "list") || is.null(data$d)) {
+    message("Computing SVD")
     # row-normalize
-    row_sds <- apply(data, 1, sd); row_sds[row_sds == 0] <- 1
-    data <- sweep(data, 1, row_sds, "/")
+    row_sds <- apply(data, 1, sd)
+    row_sds[row_sds == 0] <- 1
+    data_norm <- sweep(data, 1, row_sds, "/")
+    n <- ncol(data_norm)
     k <- if (n < 500) n else max(200, floor(n / 4))
     if (k == n) {
-      uu <- svd(data)
+      uu <- svd(data_norm)
     } else {
       set.seed(123456)
-      uu <- rsvd(data, k = k, q = 3)
+      uu <- rsvd(data_norm, k = k, q = 3)
     }
   } else {
     uu <- data
-    # permutation requires raw data
+    data_norm <- NULL  # not needed for elbow
     if (method == "permutation") {
-      message("Original data is needed for permutation; switching to elbow")
+      message("Raw data required for permutation; switching to elbow")
       method <- "elbow"
     }
-    k <- length(uu$d)
   }
 
+  # Dispatch to specific method
   if (method == "permutation") {
-    # squared singular-value proportions
-    dstat <- uu$d[1:k]^2 / sum(uu$d[1:k]^2)
-    dstat0 <- matrix(0, nrow = B, ncol = k)
-    for (i in seq_len(B)) {
-      dat0 <- t(apply(data, 1, sample))
-      if (k == ncol(data)) {
-        uu0 <- svd(dat0)
-      } else {
-        set.seed(123456)
-        uu0 <- rsvd(dat0, k = k, q = 3)
-      }
-      dstat0[i, ] <- uu0$d[1:k]^2 / sum(uu0$d[1:k]^2)
-    }
-    psv <- sapply(seq_len(k), function(i) mean(dstat0[, i] >= dstat[i]))
-    psv <- cummax(psv)  # enforce monotonicity
-    nsv <- sum(psv <= 0.1)
+    run_permutation(data_norm, uu$d, B)
   } else {
-    # elbow method: look at second-differences of singular values
-    xraw <- abs(diff(diff(uu$d)))
-    # a bit of smoothing
-    twiceit <- function(x) smooth(x, twiceit = TRUE)
-    x <- twiceit(xraw)
-    cutoff <- quantile(x, 0.5)
-    nsv <- which(x <= cutoff)[1] + 1
+    run_elbow(uu$d)
   }
-
-  nsv
 }
-
 
 
 
