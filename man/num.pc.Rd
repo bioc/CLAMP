@@ -4,12 +4,12 @@
 \alias{num.pc}
 \title{Estimate number of principal components via elbow or permutation method}
 \usage{
-num.pc(data, method = "elbow", B = 20, seed = NULL)
+num.pc(data, method = c("elbow", "permutation"), B = 20, seed = NULL)
 }
 \arguments{
 \item{data}{Either a matrix (e.g. z-scored data) or an SVD result (list with $d).}
 
-\item{method}{One of "elbow" (fast) or "permutation" (slower, but less heuristic).}
+\item{method}{One of "elbow" (fast) or "permutation" (slower).}
 
 \item{B}{Number of permutations (for method = "permutation").}
 

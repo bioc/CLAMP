@@ -155,7 +155,7 @@ binarizeTop=function(Z, top, keepVals=T){
 #' @param nfolds Number of cross-validation folds. Default is 5.
 #' @param useSE Whether to use the 1-standard-error rule for lambda selection. Default is \code{FALSE}.
 #' @param top If set, sets to 0 all but the top entries of \code{Z} per column before fitting.
-#' @param binary If \code{TRUE}, fits a binomial model (e.g., classification) to \code{Z}>0. Can be used incombination with \cod{top}. Default is \code{FALSE}.
+#' @param binary If \code{TRUE}, fits a binomial model (e.g., classification) to \code{Z}>0. Can be used incombination with \code{top}. Default is \code{FALSE}.
 #' @param nlambda Number of lambda values for glmnet. Default is 20.
 #' @param scale Whether to standardize predictors in glmnet. Default is \code{TRUE}.
 #' @param refit Whether to perform relaxed refitting using selected predictors. Default is \code{TRUE}.

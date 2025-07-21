@@ -1,0 +1,13 @@
+url: https://mchikina.github.io/PLIER2/
+
+template:
+  params:
+    bootswatch: flatly
+
+navbar:
+  title: PLIER2
+  structure:
+    left:
+      - home
+      - reference
+      - articles
