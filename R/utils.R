@@ -373,51 +373,6 @@ computeRowStatsFBM <- function(fbm, chunk_size = 1000) {
   return(list(row_means = row_means, row_variances = row_variances))
 }
 
-#' Apply Z-score transformation to a Filebacked Big Matrix (FBM)
-#'
-#' Standardizes each row of an FBM in place using precomputed row means and variances,
-#' resulting in zero-centered, unit-variance rows.
-#'
-#' @param fbm A \code{bigstatsr::FBM} object to be standardized.
-#' @param rowStats A list containing \code{row_means} and \code{row_variances} as numeric vectors.
-#' @param chunk_size Number of columns to process at a time. Default is 1000.
-#'
-#' @return Invisibly modifies the FBM in place.
-#'
-#' @details
-#' This function subtracts the row mean and divides by the row standard deviation. Processing
-#' is done in column chunks to control memory usage. Z-score standardization is performed
-#' directly on the FBM object.
-#'
-#' @export
-zscoreFBM <- function(fbm, rowStats, chunk_size = 1000) {
-
-
-  message("Applying Z-score transformation")
-
-  row_means <- rowStats$row_means
-  row_variances <- rowStats$row_variances
-
-
-  # Compute standard deviations upfront
-  row_sds <- sqrt(row_variances)
-
-  # Iterate over columns in chunks to transform in place
-  for (start_col in seq(1, ncol(fbm), by = chunk_size)) {
-    end_col <- min(start_col + chunk_size - 1, ncol(fbm))
-
-    # Extract the current chunk of columns
-    col_chunk <- fbm[, start_col:end_col]
-
-    # Compute Z-score: (X - mean) / sd
-    col_chunk <- sweep(col_chunk, 1, row_means, FUN = "-") # Subtract row means
-    col_chunk <- sweep(col_chunk, 1, row_sds, FUN = "/")   # Divide by row SD
-
-    # Store back in FBM
-    fbm[, start_col:end_col] <- col_chunk
-  }
-}
-
 #' Filter rows of a Filebacked Big Matrix based on mean and variance
 #'
 #' Filters an FBM based on row-level mean and variance thresholds, returning a new FBM
@@ -434,11 +389,9 @@ zscoreFBM <- function(fbm, rowStats, chunk_size = 1000) {
 #'   \item{\code{fbm_filtered}}{A new FBM object containing only filtered rows.}
 #'   \item{\code{kept_rows}}{Indices of rows retained in the filtering step.}
 #' }
-#'
 #' @details
 #' This function creates a new FBM and copies over only the rows that pass the filtering criteria.
 #' The original FBM is unchanged.
-#'
 #' @export
 filterFBM<- function(fbm, rowStats, mean_cutoff = NULL, var_cutoff = NULL, backingfile = "filtered_fbm") {
   row_means <- rowStats$row_means
@@ -469,7 +422,183 @@ filterFBM<- function(fbm, rowStats, mean_cutoff = NULL, var_cutoff = NULL, backi
   return(list(fbm_filtered = fbm_filtered, kept_rows = which(keep_rows)))
 }
 
+#' Z-score a filtered expression matrix for PLIER2
+#'
+#' Centers each gene to mean 0 and scales to unit variance.
+#'
+#' @param Y_filtered Numeric matrix (genes × samples) returned by preprocessPLIER2
+#' @param rowStats   Data frame with numeric columns `mean` and `variance`,
+#'                   row-named to match `rownames(Y_filtered)`
+#'
+#' @return Numeric matrix of the same dimensions as `Y_filtered`, with each
+#'         row centered and scaled.
+#' @export
+zscorePLIER2 <- function(Y_filtered, rowStats) {
+  # 1) Input validation
+  if (!is.matrix(Y_filtered) || !is.numeric(Y_filtered)) {
+    stop("`Y_filtered` must be a numeric matrix (genes × samples).")
+  }
+  if (!is.data.frame(rowStats) ||
+      !all(c("mean", "variance") %in% colnames(rowStats))) {
+    stop("`rowStats` must be a data.frame with columns 'mean' and 'variance'.")
+  }
+  # 2) Align rowStats to Y_filtered
+  if (!all(rownames(Y_filtered) %in% rownames(rowStats))) {
+    stop("Row names of `Y_filtered` and `rowStats` do not match.")
+  }
+  rowStats <- rowStats[rownames(Y_filtered), , drop = FALSE]
+  # 3) Ensure numeric
+  mu  <- as.numeric(rowStats$mean)
+  var <- as.numeric(rowStats$variance)
+  if (any(is.na(mu)) || any(is.na(var))) {
+    stop("Missing values detected in 'mean' or 'variance'.")
+  }
+  if (any(var <= 0)) {
+    stop("All variances must be positive; zero or negative found.")
+  }
+  # 4) Compute standard deviation
+  sd  <- sqrt(var)
+  # 5) Center and scale
+  #    subtract mu from each row, then divide by sd
+  Y_centered <- sweep(Y_filtered, 1L, mu,  "-")
+  Y_scaled   <- sweep(Y_centered, 1L, sd,  "/")
+  # 6) Return
+  return(Y_scaled)
+}
 
 
+#' Preprocess a bigstatsr FBM for PLIER2
+#'
+#' Makes a writable copy of the input FBM, cleans it (log2 transform if needed, fill NAs),
+#' filters rows by mean/variance, and returns the filtered FBM plus stats and indices.
+#'
+#' @param fbm A bigstatsr::FBM (genes × samples), possibly read-only.
+#' @param mean_cutoff Numeric or NULL. Minimum row mean to keep (NULL = no mean filter).
+#' @param var_cutoff  Numeric or NULL. Minimum row variance to keep (NULL = no var filter).
+#' @param backingfile Character or NULL. Base name for the *copy* FBM and filtered FBM on disk.
+#'                    If NULL, defaults to paste0(fbm$backingfile, "_preproc") and "_filtered".
+#' @return A list with:
+#'   \item{fbm_filtered}{The filtered FBM (writable).}
+#'   \item{rowStats}{List with row_means & row_variances for fbm_filtered.}
+#'   \item{kept_rows}{Integer vector of original row indices that were retained.}
+#' @export
+preprocessPLIER2FBM <- function(fbm,
+                                mean_cutoff = NULL,
+                                var_cutoff  = NULL,
+                                backingfile = NULL) {
+  # 1. Choose base names
+  base_bk <- if (is.null(backingfile)) paste0(fbm$backingfile, "_preproc") else backingfile
+  
+  # 2. Make a writable copy
+  fbm_copy <- FBM(
+    nrow        = nrow(fbm),
+    ncol        = ncol(fbm),
+    backingfile = base_bk,
+    create_bk   = TRUE
+  )
+  # copy all data
+  fbm_copy[] <- fbm[]
+  
+  # 3. Clean in-place (log2 if needed, fill NAs)
+  cleanFBM(fbm_copy)
+  
+  # 4. Compute row stats on cleaned copy
+  rs_all <- computeRowStatsFBM(fbm_copy)
+  
+  # 5. Filter rows, writing to a new filtered FBM
+  filt_bk <- paste0(base_bk, "_filtered")
+  filter_res <- filterFBM(
+    fbm_copy,
+    rowStats    = rs_all,
+    mean_cutoff = mean_cutoff,
+    var_cutoff  = var_cutoff,
+    backingfile = filt_bk
+  )
+  fbm_filtered <- filter_res$fbm_filtered
+  kept_rows    <- filter_res$kept_rows
+  
+  # 6. Subset stats to kept rows
+  stats_filt <- list(
+    row_means     = rs_all$row_means[kept_rows],
+    row_variances = rs_all$row_variances[kept_rows]
+  )
+  
+  list(
+    fbm_filtered = fbm_filtered,
+    rowStats     = stats_filt,
+    kept_rows    = kept_rows
+  )
+}
 
+#' Z-score a filtered FBM in-place
+#'
+#' Standardizes each row of an FBM using provided row means and variances.
+#'
+#' @param fbm_filtered A bigstatsr::FBM produced by preprocessPLIER2FBM().
+#' @param rowStats A list with row_means and row_variances from that FBM.
+#' @param chunk_size Columns per block (default 1000).
+#' @export
+zscorePLIER2FBM <- function(fbm_filtered, rowStats, chunk_size = 1000) {
+  message("Applying Z-score transformation")
+  means <- rowStats$row_means
+  sds   <- sqrt(rowStats$row_variances)
+  sds[sds == 0] <- 1
+  
+  for (start in seq(1, ncol(fbm_filtered), by = chunk_size)) {
+    end <- min(start + chunk_size - 1, ncol(fbm_filtered))
+    mat <- fbm_filtered[, start:end]
+    mat <- sweep(mat, 1, means, FUN = "-")
+    mat <- sweep(mat, 1, sds,   FUN = "/")
+    fbm_filtered[, start:end] <- mat
+  }
+  
+  invisible(NULL)
+}
+
+#' Preprocess an expression matrix for PLIER2
+#'
+#' Filters genes by mean expression and variance, returning the filtered matrix
+#' and per-gene statistics.
+#'
+#' @param Y Numeric matrix of gene expression (rows = genes, cols = samples)
+#' @param mean_cutoff Numeric. Minimum row-mean required to keep a gene (default 0).
+#' @param var_cutoff  Numeric. Minimum row-variance required to keep a gene (default 0).
+#'
+#' @return A list with components:
+#'   - **fbm_filtered**: filtered matrix (genes × samples)
+#'   - **rowStats**: data.frame with columns `mean` and `variance` for each kept gene
+#'   - **kept_rows**: integer vector of the original row indices that were kept
+#'
+#' @export
+preprocessPLIER2 <- function(Y, mean_cutoff = 0, var_cutoff = 0) {
+  if (!is.matrix(Y) || !is.numeric(Y)) {
+    stop("`Y` must be a numeric matrix (genes × samples).")
+  }
+  # Compute per‐gene statistics
+  row_mean <- rowMeans(Y, na.rm = TRUE)
+  row_var  <- apply(Y, 1, stats::var,  na.rm = TRUE)
+  
+  rowStats <- data.frame(
+    mean     = row_mean,
+    variance = row_var,
+    stringsAsFactors = FALSE
+  )
+  rownames(rowStats) <- rownames(Y)
+  
+  # Identify genes passing both thresholds
+  keep <- which(rowStats$mean >= mean_cutoff & rowStats$variance >= var_cutoff)
+  if (length(keep) == 0) {
+    stop("No genes passed the mean/variance filters.")
+  }
+  
+  # Subset matrix and stats
+  Y_filtered       <- Y[keep, , drop = FALSE]
+  rowStats_filtered <- rowStats[keep, , drop = FALSE]
+  
+  return(list(
+    Y_filtered = Y_filtered,
+    rowStats   = rowStats_filtered,
+    kept_rows  = keep
+  ))
+}
 

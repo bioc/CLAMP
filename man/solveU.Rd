@@ -44,7 +44,7 @@ solveU(
 
 \item{top}{If set, sets to 0 all but the top entries of \code{Z} per column before fitting.}
 
-\item{binary}{If \code{TRUE}, fits a binomial model (e.g., classification) to \code{Z}>0. Can be used incombination with \cod{top}. Default is \code{FALSE}.}
+\item{binary}{If \code{TRUE}, fits a binomial model (e.g., classification) to \code{Z}>0. Can be used incombination with \code{top}. Default is \code{FALSE}.}
 
 \item{nlambda}{Number of lambda values for glmnet. Default is 20.}
 

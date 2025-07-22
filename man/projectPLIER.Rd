@@ -12,7 +12,7 @@ projectPLIER(PLIERres, newdata, scale = 1)
 \item{newdata}{A gene expression matrix (genes × samples) to be projected. Must have the same genes (rows) as \code{PLIERres$Z}.
 Can be a standard matrix, sparse matrix, or FBM/big.matrix.}
 
-\item{scale}{Optional numeric multiplier for the L2 regularization term. Default is 1.}
+\item{scale}{Optional numeric multiplier for the L2 regularization terms. Default is 1.}
 }
 \value{
 A matrix \code{B} of projected latent loadings (LVs × samples) for the new dataset.

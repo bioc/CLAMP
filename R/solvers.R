@@ -33,11 +33,16 @@ BH<-function(p){p.adjust(p, method="BH")}
 #' @param B A numeric matrix of the same dimensions as \code{A}.
 #' @return A numeric vector of correlations, one per row.
 row_cor <- function(A, B) {
-  A_centered <- A - rowMeans(A)
-  B_centered <- B - rowMeans(B)
-  numerator <- rowSums(A_centered * B_centered)
-  denom <- sqrt(rowSums(A_centered^2) * rowSums(B_centered^2))
-  numerator / denom
+  A_mat <- as.matrix(A)
+  B_mat <- as.matrix(B)
+  if (!all(dim(A_mat) == dim(B_mat))) {
+    stop("row_cor(): dimensions of A and B must match")
+  }
+  A_centered <- A_mat - rowMeans(A_mat)
+  B_centered <- B_mat - rowMeans(B_mat)
+  num <- rowSums(A_centered * B_centered)
+  den <- sqrt(rowSums(A_centered^2) * rowSums(B_centered^2))
+  num / den
 }
 
 #' Matrix multiplication with support for FBM objects
@@ -150,7 +155,7 @@ binarizeTop=function(Z, top, keepVals=T){
 #' @param nfolds Number of cross-validation folds. Default is 5.
 #' @param useSE Whether to use the 1-standard-error rule for lambda selection. Default is \code{FALSE}.
 #' @param top If set, sets to 0 all but the top entries of \code{Z} per column before fitting.
-#' @param binary If \code{TRUE}, fits a binomial model (e.g., classification) to \code{Z}>0. Can be used incombination with \cod{top}. Default is \code{FALSE}.
+#' @param binary If \code{TRUE}, fits a binomial model (e.g., classification) to \code{Z}>0. Can be used incombination with \code{top}. Default is \code{FALSE}.
 #' @param nlambda Number of lambda values for glmnet. Default is 20.
 #' @param scale Whether to standardize predictors in glmnet. Default is \code{TRUE}.
 #' @param refit Whether to perform relaxed refitting using selected predictors. Default is \code{TRUE}.
@@ -302,7 +307,7 @@ solveU=function(Z,  Chat=NULL, priorMat, penalty.factor,pathwaySelection="fast",
     colnames(U)=paste("LV", 1:ncol(U))
 
 
-
+    U <- as.matrix(U)
 
   return(list(U = U))
 
@@ -539,7 +544,6 @@ PLIERbase=function(Y, k,svdres=NULL,  L1=NULL, L2=NULL,
   is_fbm <- inherits(Y, "FBM")
   is_sparse <- inherits(Y, "dgCMatrix")
 
-
   ng=nrow(Y)
   ns=ncol(Y)
 
@@ -700,22 +704,6 @@ PLIERbase=function(Y, k,svdres=NULL,  L1=NULL, L2=NULL,
   return(list(B=B, Z=Z, Zraw=Zraw, L1=L1, L2=L2))
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #' Full PLIER model with prior information and cross-validation
 #'
 #' Runs the full PLIER (Pathway-Level Information ExtractoR) model using a gene expression matrix
@@ -782,17 +770,14 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
   getT=function(x){-quantile(x[x<0], adaptive.p)}
 
   pathwaySelection=match.arg(pathwaySelection, c("complete", "fast"))
-
-
-
-
+  
+  priorMat <- as.matrix(priorMat)
+  
   message("**PLIER v2 **")
-
 
   # Detect matrix type
   is_fbm <- inherits(Y, "FBM")
   is_sparse <- inherits(Y, "dgCMatrix")
-
 
   if(nrow(priorMat)!=nrow(Y) || !all(rownames(priorMat)==rownames(data))){
     if(!allGenes){
@@ -821,9 +806,7 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
     message(paste("Removed", length(iibad), "pathways with too few genes"))
   }
   if(doCrossval){
-
-
-    priorMatCV=priorMat
+    priorMatCV <- as.matrix(priorMat)
     if(!is.null(seed))
       set.seed(seed)
     for(j in 1:ncol(priorMatCV)){
@@ -876,7 +859,6 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
       message("k is set to ", k)
     }
 
-
     message("Running PLIERbase")
     if(is.null(plier.base.result)){
       plier.base.result=PLIERbase(Y, k=k)
@@ -913,11 +895,6 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
 
   oldB=B
 
-
-
-
-
-
   if(!is.null(rseed)){
     message("using random start")
     set.seed(rseed)
@@ -925,20 +902,10 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
     Z=apply(Z,2,sample)
   }
 
-
-
-
-
-
   U=matrix(0,nrow=ncol(C), ncol=k)
 
 
   round2=function(x){signif(x,4)}
-
-
-
-
-
 
   iter.full.start=iter.full=u.iter
 
@@ -959,16 +926,12 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
   }
   Zraw=Z
   Z2=matrix(0, nrow=nrow(Z), ncol=ncol(Z))
+  
+  B <- as.matrix(B)
+
   for ( iter in 1:max.iter){
-
-
-
-
-
+    
     if(iter>=iter.full.start){
-
-
-
 
       if(iter>=iter.full&&num.U.updates<max.U.updates& iter %% 2 ==1 ){
 
@@ -1000,30 +963,16 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
 
           Z2=L1*C%*%U
 
-
       }
-
-
+      
       curfrac=(npos<-sum(apply(U,2,max)>0))/k
       #Z1=Y%*%t(B)
       Z1=mat_mult(Y, t(B))
 
-
-
-
-
      # ii=which(Z2>0)
      # ratio=median(Z2[ii]/abs(Z1[ii]))
 
-
-
-
-
-
         Z=(Z1+Z2)%*%solve(tcrossprod(B)+L1k)
-
-
-
 
     }
 
@@ -1031,8 +980,6 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
 
       Z=mat_mult(Y,t(B))%*%solve(tcrossprod(B)+L1k)
     }
-
-
 
     if(adaptive.p>0){
 
@@ -1051,11 +998,7 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
       Zraw=Z
     }
 
-
-
-
     oldB=B
-
 
     if(is_fbm){
       ZYt=big_cprodMat(Y, as.matrix(Z))
@@ -1070,20 +1013,12 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
     Bdiff=sum((B-oldB)^2)/sum(B^2)
     minCor=min(row_cor(B, oldB))
 
-
-
     BdiffTrace=c(BdiffTrace, Bdiff)
-
 
     if (trace) {
       cat(sprintf("\rProgress %d / %d | Bdiff=%.6f", iter, max.iter, Bdiff))
       flush.console()
     }
-
-
-
-
-
 
     if(iter>52&&Bdiff>BdiffTrace[iter-50]){
       BdiffCount=BdiffCount+1
@@ -1115,6 +1050,8 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
       out$Z[out$Z<0]=0
     }
     message("crossValidation")
+    priorMat_m   <- as.matrix(priorMat)
+    priorMatCV_m <- as.matrix(priorMatCV)
     outAUC=crossVal(out, priorMat, priorMatCV)
     out$Z=Z
     out$Uauc=outAUC$Uauc
@@ -1122,7 +1059,6 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
     out$summary=outAUC$summary
     out$priorMatCV=priorMatCV
     out$priorMat=priorMat
-
     out$withPrior=which(colSums(out$U)>0)
 
     tt=apply(out$Uauc,2,max)
@@ -1188,8 +1124,93 @@ projectPLIER = function(PLIERres, newdata, scale=1) {
   return(B)
 }
 
+## Refactored PC estimation functions
 
+#' Run elbow method to estimate number of PCs
+#'
+#' @param d Vector of singular values
+#' @return Estimated number of PCs via elbow
+run_elbow <- function(d) {
+  # compute second differences
+  x_raw <- abs(diff(diff(d)))
+  # smoothing helper
+  twiceit <- function(x, twiceit = TRUE) smooth(x, twiceit = TRUE)
+  x_smooth <- twiceit(x_raw)
+  cutoff <- quantile(x_smooth, 0.5)
+  # first index below cutoff plus one for PC count
+  which(x_smooth <= cutoff)[1] + 1
+}
 
+#' Run permutation method to estimate number of PCs
+#'
+#' @param data Raw data matrix (row-normalized)
+#' @param d Vector of singular values
+#' @param B Number of permutations
+#' @return Estimated number of PCs via permutation test
+run_permutation <- function(data, d, B = 20) {
+  k <- length(d)
+  # observed proportions
+  obs_prop <- d^2 / sum(d^2)
+  # permuted proportions matrix
+  perm_mat <- matrix(0, nrow = B, ncol = k)
+  for (i in seq_len(B)) {
+    dat0 <- t(apply(data, 1, sample))
+    if (ncol(dat0) == k) {
+      uu0 <- svd(dat0)
+    } else {
+      set.seed(123456)
+      uu0 <- rsvd(dat0, k = k, q = 3)
+    }
+    perm_mat[i, ] <- uu0$d[1:k]^2 / sum(uu0$d[1:k]^2)
+  }
+  p_vals <- apply(perm_mat >= obs_prop, 2, mean)
+  p_vals <- cummax(p_vals)
+  sum(p_vals <= 0.1)
+}
+
+#' Estimate number of principal components via elbow or permutation method
+#'
+#' @param data    Either a matrix (e.g. z-scored data) or an SVD result (list with $d).
+#' @param method  One of "elbow" (fast) or "permutation" (slower).
+#' @param B       Number of permutations (for method = "permutation").
+#' @param seed    Seed for reproducibility.
+#' @return        Estimated number of PCs.
+#' @export
+num.pc <- function(data, method = c("elbow", "permutation"), B = 20, seed = NULL) {
+  method <- match.arg(method)
+  if (!is.null(seed)) set.seed(seed)
+
+  # Prepare SVD result
+  if (!inherits(data, "list") || is.null(data$d)) {
+    message("Computing SVD")
+    # row-normalize
+    row_sds <- apply(data, 1, sd)
+    row_sds[row_sds == 0] <- 1
+    data_norm <- sweep(data, 1, row_sds, "/")
+    n <- ncol(data_norm)
+    k <- if (n < 500) n else max(200, floor(n / 4))
+    if (k == n) {
+      uu <- svd(data_norm)
+    } else {
+      set.seed(123456)
+      uu <- rsvd(data_norm, k = k, q = 3)
+    }
+  } else {
+    uu <- data
+    data_norm <- NULL  # not needed for elbow
+    if (method == "permutation") {
+      message("Raw data required for permutation; switching to elbow")
+      method <- "elbow"
+    }
+  }
+
+  # Dispatch to specific method
+  if (method == "permutation") {
+    run_permutation(data_norm, uu$d, B)
+  } else {
+    run_elbow(uu$d)
+  }
+}
 
 
 
