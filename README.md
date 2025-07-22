@@ -15,21 +15,57 @@
 
 The goal of PLIER2 is to provide an easy-to-use package to extract interpretable latent variables from large transcriptomic datasets using biological priors.
 
+## Local development via Conda
+
+We keep a fully specified environment file at `envs/plier2.yaml`. From your package root, create and activate it like so:
+
+```bash
+# 1. Create the environment from YAML
+conda env create -f envs/plier2.yaml
+
+# 2. Activate
+conda activate plier2
+```
+
+```r
+## 3. Install local PLIER2
+library(remotes)
+REPO_PATH <- "~/path/to/PLIER2"  # adjust
+
+remotes::install_local(
+  REPO_PATH,
+  force        = TRUE,
+  dependencies = FALSE
+)
+
+# 4. Verify
+library(PLIER2)
+packageVersion("PLIER2")
+```
+
 ## Installation
 
 You can install the latest release of `PLIER2` from Bioconductor:
 
-    if (!requireNamespace("BiocManager", quietly = TRUE))
-        install.packages("BiocManager")
-    
-    BiocManager::install("PLIER2")
+``` r
+if (!requireNamespace("BiocManager", quietly = TRUE)) {
+    install.packages("BiocManager")
+}
 
+BiocManager::install("PLIER2")
+```
 
 If you want to test the development version, you can install it from the github repository:
 
-    BiocManager::install("mchikina/PLIER2")
+``` r
+BiocManager::install("mchikina/PLIER2")
+```
 
-Now you can load the package using `library(PLIER2)`.
+Now you can load the package using:
+
+``` r
+library(PLIER2)
+```
 
 ## Basic usage
 
@@ -37,10 +73,7 @@ For detailed instructions on how to use PLIER2, please see the [vignette](https:
 
 ``` r
 library(PLIER2)
-```
-
-``` r
-
+#some example
 ```
 
 ## Code of Conduct
