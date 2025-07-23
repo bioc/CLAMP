@@ -20,27 +20,17 @@ The goal of PLIER2 is to provide an easy-to-use package to extract interpretable
 We keep a fully specified environment file at `envs/plier2.yaml`. From your package root, create and activate it like so:
 
 ```bash
-# 1. Create the environment from YAML
 conda env create -f envs/plier2.yaml
 
-# 2. Activate
 conda activate plier2
-```
 
-```r
-## 3. Install local PLIER2
-library(remotes)
-REPO_PATH <- "~/path/to/PLIER2"  # adjust
-
-remotes::install_local(
-  REPO_PATH,
+remotes::install_github(
+  "mchikina/PLIER2",
   force        = TRUE,
-  dependencies = FALSE
+  dependencies = TRUE
 )
 
-# 4. Verify
 library(PLIER2)
-packageVersion("PLIER2")
 ```
 
 ## Installation
