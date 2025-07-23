@@ -24,13 +24,13 @@ conda env create -f envs/plier2.yaml
 
 conda activate plier2
 
-remotes::install_github(
+library(devtools)
+
+install_github(
   "mchikina/PLIER2",
   force        = TRUE,
   dependencies = TRUE
 )
-
-library(PLIER2)
 ```
 
 ## Installation
