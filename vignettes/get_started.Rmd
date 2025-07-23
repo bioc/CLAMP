@@ -253,7 +253,8 @@ wb_fullRes <- PLIERfull(
   Chat              = wb_chatObj,
   k                 = wb_k_pl,
   doCrossval        = TRUE,
-  trace             = TRUE
+  trace             = TRUE,
+  max.U.updates=50
 )
 
 ```
@@ -390,7 +391,8 @@ alz_fullRes <- PLIERfull(
   Chat              = alz_chatObj,
   k                 = PLIER_K_alz,
   doCrossval        = TRUE,
-  trace             = TRUE
+  trace             = TRUE,
+  max.U.updates=50
 )
 ```
 
@@ -525,7 +527,8 @@ islet_fullRes <- PLIERfull(
   Chat              = islet_chatObj,
   k                 = PLIER_K_is,
   doCrossval        = TRUE,
-  trace             = TRUE
+  trace             = TRUE,
+  max.U.updates=50
 )
 ```
 
