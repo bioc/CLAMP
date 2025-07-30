@@ -171,7 +171,9 @@ binarizeTop=function(Z, top, keepVals=T){
 #' @importFrom Matrix crossprod
 #' @export
 
-solveU=function(Z,  Chat=NULL, priorMat, penalty.factor,pathwaySelection="fast", alpha=0.9, maxPath=10,  nfolds=5,  useSE=F, top=NULL, binary=F,  nlambda=20, scale=T, refit=T, Uprev=NULL,...){
+solveU=function(Z,  Chat=NULL, priorMat, penalty.factor,pathwaySelection="fast", alpha=0.9,
+                maxPath=10,  nfolds=5,  useSE=F, top=NULL, binary=F,
+                nlambda=20, scale=T, refit=T, Uprev=NULL,...){
 
   if(nrow(Z)!=nrow(priorMat)){
     cm=commonRows(Z, priorMat)
@@ -186,7 +188,7 @@ solveU=function(Z,  Chat=NULL, priorMat, penalty.factor,pathwaySelection="fast",
     col_sds <- sqrt(Matrix::colMeans(priorMat^2) - col_means^2)
     col_sds[col_sds == 0] <- 1  # avoid divide-by-zero
     priorMat <- Matrix::t((Matrix::t(priorMat) - col_means) / col_sds)
-}
+  }
   if(is.null(Chat)){
     Chat=pinv.ridge(crossprod(priorMat), 5)%*%(t(priorMat))
   }
@@ -199,8 +201,8 @@ solveU=function(Z,  Chat=NULL, priorMat, penalty.factor,pathwaySelection="fast",
   #Zhat <- matrix(0, nrow = nrow(Z), ncol = ncol(Z))
   if(is.null(Uprev)){
 
-  U <- Matrix::Matrix(0, nrow = ncol(priorMat), ncol = ncol(Z), sparse = TRUE)
-#  U=matrix(0,nrow=ncol(priorMat), ncol=ncol(Z))
+    U <- Matrix::Matrix(0, nrow = ncol(priorMat), ncol = ncol(Z), sparse = TRUE)
+    #  U=matrix(0,nrow=ncol(priorMat), ncol=ncol(Z))
   }
   else{
     U=Uprev
@@ -219,11 +221,14 @@ solveU=function(Z,  Chat=NULL, priorMat, penalty.factor,pathwaySelection="fast",
   }
 
 
-    for(i in 1:ncol(Z)){
-     if(any(U[,i]>0)){
+  for(i in 1:ncol(Z)){
+    if(all(U[,i]==0)){
 
+
+      if(var(Z[,i])<1e-9){
+       # message("skipping")
         next
-     }
+      }
       if(pathwaySelection=="fast"){
         iip=which(Ur[,i]<=maxPath)
 
@@ -242,72 +247,75 @@ solveU=function(Z,  Chat=NULL, priorMat, penalty.factor,pathwaySelection="fast",
         set.seed(1);gres=cv.glmnet(y=(Z[,i]>0)+1-1, x=priorMat[,iip], family="binomial", alpha=alpha, lower.limits=0, foldid =((1:nrow(Z)) %%nfolds)+1,  keep = F , nfolds = nfolds,  type.measure="auc", dfmax=maxPath, nlambda=nlambda, standardize=scale,nlambda=nlambda,  ...)
       }
 
-
-      if(refit){
-
-        # Select lambda
+    } #end if all U[,i]==0
+    if(refit){
+      if (any(U[, i] != 0)) {
+        selected_features <- which(U[, i] != 0)
+      } else {
         s_best <- if (useSE) gres$lambda.1se else gres$lambda.min
         active_coef <- coef(gres, s = s_best)
         active_ix <- which(active_coef[-1] != 0)
         selected_features <- iip[active_ix]
-        if(length(selected_features)==0)
-          next
-        X_sel <- priorMat[, selected_features, drop = FALSE]
+      }
 
-        # Add dummy column if only one predictor
-        add_dummy <- ncol(X_sel) == 1
-        if (add_dummy) {
-          X_sel <- cbind(X_sel, dummy = 0)
-        }
+      if(length(selected_features)==0)
+        next
+      X_sel <- priorMat[, selected_features, drop = FALSE]
 
-        # Fit relaxed model
-        if (!binary) {
-          fit_relaxed <- glmnet(X_sel, Z[, i], alpha = 0, lambda = 0,
-                                lower.limits = 0,standardize=scale)
-          coefs <- as.vector(coef(fit_relaxed))[-1]
-          if (add_dummy) coefs <- coefs[-length(coefs)]
-          U[selected_features, i] <- coefs
+      # Add dummy column if only one predictor
+      add_dummy <- ncol(X_sel) == 1
+      if (add_dummy) {
+        X_sel <- cbind(X_sel, dummy = 0)
+      }
+
+      # Fit relaxed model
+      if (!binary) {
+        fit_relaxed <- glmnet(X_sel, Z[, i], alpha = 0, lambda = 0,
+                              lower.limits = 0,standardize=scale)
+        coefs <- as.vector(coef(fit_relaxed))[-1]
+        if (add_dummy) coefs <- coefs[-length(coefs)]
+        U[selected_features, i] <- coefs
         #  Zhat[, i] <- predict(fit_relaxed, newx = X_sel, s = 0)[,1]
-        } else {
-          fit_relaxed <- glmnet(X_sel, (Z[, i] > 0) + 0, family = "binomial", alpha = 0, lambda = 0,
-                                lower.limits = 0,standardize=scale)
-          coefs <- as.vector(coef(fit_relaxed))[-1]
-          if (add_dummy) coefs <- coefs[-length(coefs)]
-          U[selected_features, i] <- coefs
-         # Zhat[, i] <- predict(fit_relaxed, newx = X_sel, s = 0, type = "response")[,1]
-
-        }
+      } else {
+        fit_relaxed <- glmnet(X_sel, (Z[, i] > 0) + 0, family = "binomial", alpha = 0, lambda = 0,
+                              lower.limits = 0,standardize=scale)
+        coefs <- as.vector(coef(fit_relaxed))[-1]
+        if (add_dummy) coefs <- coefs[-length(coefs)]
+        U[selected_features, i] <- coefs
+        # Zhat[, i] <- predict(fit_relaxed, newx = X_sel, s = 0, type = "response")[,1]
 
       }
-      else{
-        #old code with extra functions
-#      betaI=getNonZeroBetas(gres,se = useSE, index=T)
- #     beta <- getNonZeroBetas(gres, se = useSE, index = FALSE)
-  #    U[iip[betaI], i] <- as.vector(beta)
+
+    }
+    else{
+      #old code with extra functions
+      #      betaI=getNonZeroBetas(gres,se = useSE, index=T)
+      #     beta <- getNonZeroBetas(gres, se = useSE, index = FALSE)
+      #    U[iip[betaI], i] <- as.vector(beta)
 
       s_best <- if (useSE) gres$lambda.1se else gres$lambda.min
       coef_vec <- as.vector(coef(gres, s = s_best))[-1]  # drop intercept
       betaI <- which(coef_vec != 0)
       U[iip[betaI], i] <- coef_vec[betaI]
 
-      }
-      #end for i in Z
-
-
-
-
-
     }
+    #end for i in Z
 
 
 
-    cat(paste(", Number of annotated columns is", sum(Matrix::colSums(U)>0)))
-   # rownames(U)=substr(colnames(priorMat),1,30)
-    rownames(U)=colnames(priorMat)
-    colnames(U)=paste("LV", 1:ncol(U))
 
 
-    U <- as.matrix(U)
+  }
+
+
+
+  cat(paste(", Number of annotated columns is", sum(Matrix::colSums(U)>0)))
+  # rownames(U)=substr(colnames(priorMat),1,30)
+  rownames(U)=colnames(priorMat)
+  colnames(U)=paste("LV", 1:ncol(U))
+
+
+  U <- as.matrix(U)
 
   return(list(U = U))
 
@@ -347,6 +355,50 @@ getChat <- function(priorMat, scale = TRUE) {
 
 
 
+#' Subset and filter multiple pathway matrices to match target genes
+#'
+#' Filters gene-by-pathway annotation matrices to retain only pathways
+#' with sufficient overlap with a given gene set. The result is a sparse matrix
+#' aligned to \code{new.genes}, combining all inputs column-wise.
+#'
+#' @param ... One or more sparse binary matrices (genes × pathways).
+#' @param new.genes Character vector of gene names to match.
+#' @param min.genes Minimum number of overlapping genes required to keep a pathway.
+#'
+#' @return A sparse matrix with rows = \code{new.genes} and columns = filtered pathways from all inputs.
+#' @export
+getMatchedPathwayMat2 <- function(..., new.genes, min.genes = 10) {
+  pathMats <- list(...)
+
+  filtered <- lapply(pathMats, function(pathMat) {
+    cm <- intersect(rownames(pathMat), new.genes)
+    message("There are ", length(cm), " genes in the intersection between data and prior")
+
+
+
+    matchPathMat <- Matrix::sparseMatrix(
+      i = match(cm, new.genes),
+      j = rep(1, length(cm)),  # temporary
+      dims = c(length(new.genes), ncol(pathMat)),
+      x = 0,
+      dimnames = list(new.genes, colnames(pathMat))
+    )
+    matchPathMat[cm, ] <- pathMat[cm, ]
+
+    genesInPath <- Matrix::colSums(matchPathMat)
+
+    ii <- which(genesInPath >= min.genes)
+
+    message(sprintf("Removing %d pathways", ncol(matchPathMat) - length(ii)))
+
+    matchPathMat[, ii, drop = FALSE]
+
+  })
+
+  if (length(filtered) == 1) return(filtered[[1]])
+  do.call(Matrix::cBind, filtered)
+
+}
 
 
 
@@ -369,9 +421,9 @@ getChat <- function(priorMat, scale = TRUE) {
 #'
 #' @return A sparse matrix of dimensions \code{length(new.genes)} × filtered pathways.
 #' @export
-getMatchedPathwayMat <- function(pathMat, new.genes, min.genes = 10) {
+getMatchedPathwayMatOld <- function(pathMat, new.genes, min.genes = 10) {
   cm <- intersect(rownames(pathMat), new.genes)
-  mymessage("there are ", length(cm), " genes in the intersection between data and prior")
+  mymessage("There are ", length(cm), " genes in the intersection between data and prior")
 
   matchPathMat <- Matrix::sparseMatrix(
     i = match(cm, new.genes),
@@ -458,8 +510,8 @@ crossVal<-function(plierRes,priorMat, priorMatcv){
   out=matrix(ncol=4, nrow=0)
   ii=which(Matrix::colSums(plierRes$U)>0)
 
- # Uauc <- Matrix::sparseMatrix(i = integer(0), j = integer(0), dims = dim(plierRes$U))
-#  Up <- Matrix::sparseMatrix(i = integer(0), j = integer(0), dims = dim(plierRes$U))
+  # Uauc <- Matrix::sparseMatrix(i = integer(0), j = integer(0), dims = dim(plierRes$U))
+  #  Up <- Matrix::sparseMatrix(i = integer(0), j = integer(0), dims = dim(plierRes$U))
   Uauc=Matrix(0, nrow = nrow(plierRes$U), ncol=ncol(plierRes$U), sparse=T)
   Up=Matrix(0,nrow = nrow(plierRes$U), ncol=ncol(plierRes$U), sparse=T)
   for ( i in ii){ #for each column in U
@@ -535,8 +587,8 @@ crossVal<-function(plierRes,priorMat, priorMatcv){
 #'
 #' @export
 PLIERbase=function(Y, k,svdres=NULL,  L1=NULL, L2=NULL,
-                      Zpos=T,max.iter=200, tol=5e-4, trace=F,
-                      rseed=NULL, B=NULL, scale=1, pos.adj=3, adaptive.p=0.05, adaptive.iter=20,  cutoff=0){
+                   Zpos=T,max.iter=200, tol=5e-4, trace=F,
+                   rseed=NULL, B=NULL, scale=1, pos.adj=3, adaptive.p=0.05, adaptive.iter=20,  cutoff=0){
 
 
   #message("Checking type")
@@ -553,7 +605,7 @@ PLIERbase=function(Y, k,svdres=NULL,  L1=NULL, L2=NULL,
   message("****")
   k <- min(k, min(dim(Y)) - 1)
 
- if (is.null(svdres) && is.null(B)) {
+  if (is.null(svdres) && is.null(B)) {
     message("Computing SVD")
     if (is_fbm) {
       # For FBM, we need special handling for SVD
@@ -660,11 +712,11 @@ PLIERbase=function(Y, k,svdres=NULL,  L1=NULL, L2=NULL,
 
     if(is_fbm){
       ZYt=big_cprodMat(Y, as.matrix(Z))
-      ZY=t(ZYt)
-      B=solve(t(Z)%*%Z+L2k)%*%ZY
+      ZY=Matrix::t(ZYt)
+      B=solve(Matrix::t(Z)%*%Z+L2k)%*%ZY
     }
     else{
-      B=solve(t(Z)%*%Z+L2k)%*%mat_mult(t(Z),Y)
+      B=solve(Matrix::t(Z)%*%Z+L2k)%*%mat_mult(Matrix::t(Z),Y)
     }
 
     #update error
@@ -764,15 +816,20 @@ PLIERbase=function(Y, k,svdres=NULL,  L1=NULL, L2=NULL,
 #' is used to hold out gene annotations in \code{priorMat} and evaluate latent variable specificity.
 #'
 #' @export
-PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NULL, L2=NULL, top=NULL, cvn=5, max.iter=350, trace=F, Chat=NULL, maxPath=10, doCrossval=T, penalty.factor=rep(1,ncol(priorMat)), glm_alpha=0.9, minGenes=10, tol=5e-4, seed=123456, allGenes=F, rseed=NULL,  max.U.updates=5, pathwaySelection=c("fast"), multiplier=1, adaptive.p=0.05, useNNLS=T, useRaw=T, refitAll=F){
+PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NULL, L2=NULL, top=NULL,
+                   cvn=5, max.iter=350, trace=F, Chat=NULL, maxPath=10, doCrossval=T,
+                   penalty.factor=rep(1,ncol(priorMat)), glm_alpha=0.9,
+                   minGenes=10, tol=5e-4, seed=123456, allGenes=F, rseed=NULL,
+                   max.U.updates=5, pathwaySelection=c("fast"), multiplier=1,
+                   adaptive.p=0.05, useNNLS=T, useRaw=T, refitAll=F, useSE=F){
 
 
   getT=function(x){-quantile(x[x<0], adaptive.p)}
 
   pathwaySelection=match.arg(pathwaySelection, c("complete", "fast"))
-  
+
   priorMat <- as.matrix(priorMat)
-  
+
   message("**PLIER v2 **")
 
   # Detect matrix type
@@ -793,7 +850,7 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
       priorMat=rbind(priorMat, eMat)
       priorMat=priorMat[rownames(Y),]
 
-          }
+    }
 
   }
 
@@ -918,61 +975,65 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
 
   if(is_fbm){
     ZYt=big_cprodMat(Y, as.matrix(Z))
-    ZY=t(ZYt)
-    B=solve(t(Z)%*%Z+L2k)%*%ZY
+    ZY=Matrix::t(ZYt)
+    B=solve(Matrix::t(Z)%*%Z+L2k)%*%ZY
   }
   else{
-    B=solve(t(Z)%*%Z+L2k)%*%mat_mult(t(Z),Y)
+    B=solve(Matrix::t(Z)%*%Z+L2k)%*%mat_mult(Matrix::t(Z),Y)
   }
   Zraw=Z
   Z2=matrix(0, nrow=nrow(Z), ncol=ncol(Z))
-  
+
   B <- as.matrix(B)
 
   for ( iter in 1:max.iter){
-    
+
     if(iter>=iter.full.start){
 
       if(iter>=iter.full&&num.U.updates<max.U.updates& iter %% 2 ==1 ){
 
-    #    cat(paste(", Updating U"))
-      if(any(Zraw<0)){
-        stop()
-      }
-       if (refitAll || num.U.updates%%5==0){
-         Uprev=NULL
-       #  cat(", Refitting all U coefficinets")
-       }
+        #    cat(paste(", Updating U"))
+        if(any(Zraw<0)){
+          stop()
+        }
+        if (refitAll || num.U.updates%%5==0){
+          Uprev=NULL
+          #  cat(", Refitting all U coefficinets")
+        }
         else{
           Uprev=U
         }
 
-       if(useRaw){
-         res=solveU(Zraw, Chat, C, penalty.factor, pathwaySelection, glm_alpha, maxPath, binary=F, nfolds=cvn, top=top, useNNLS=useNNLS, Uprev=Uprev )
-       }
+        if(useRaw){
+          res=solveU(Zraw, Chat, C, penalty.factor, pathwaySelection,
+                     glm_alpha, maxPath, binary=F, nfolds=cvn, top=top,
+                     useNNLS=useNNLS, Uprev=Uprev, useSE = useSE )
+        }
         else{
-          res=solveU(Z, Chat, C, penalty.factor, pathwaySelection, glm_alpha, maxPath, binary=F, nfolds=cvn, top=top, useNNLS=useNNLS, Uprev=Uprev )
+          res=solveU(Z, Chat, C, penalty.factor, pathwaySelection,
+                     glm_alpha, maxPath, binary=F, nfolds=cvn, top=top,
+                     useNNLS=useNNLS, Uprev=Uprev, useSE=useSE )
 
         }
-          U=res$U
+        U=res$U
 
         num.U.updates=num.U.updates+1
 
         iter.full=iter.full+iter.full.start
 
 
-          Z2=L1*C%*%U
+        Z2=L1*C%*%U
 
       }
-      
+
       curfrac=(npos<-sum(apply(U,2,max)>0))/k
       #Z1=Y%*%t(B)
       Z1=mat_mult(Y, t(B))
 
-     # ii=which(Z2>0)
-     # ratio=median(Z2[ii]/abs(Z1[ii]))
+      # ii=which(Z2>0)
+      # ratio=median(Z2[ii]/abs(Z1[ii]))
 
-        Z=(Z1+Z2)%*%solve(tcrossprod(B)+L1k)
+      Z=(Z1+Z2)%*%solve(tcrossprod(B)+L1k)
 
     }
 
@@ -1002,12 +1063,12 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
 
     if(is_fbm){
       ZYt=big_cprodMat(Y, as.matrix(Z))
-      ZY=t(ZYt)
-      B=solve(t(Z)%*%Z+L2k)%*%ZY
+      ZY=Matrix::t(ZYt)
+      B=solve(Matrix::t(Z)%*%Z+L2k)%*%ZY
     }
     else{
       Z_mat <- if (inherits(Z, "matrix")) Z else as.matrix(Z)
-      B=solve(t(Z_mat)%*%Z+L2k)%*%mat_mult(t(Z),Y)
+      B=solve(Matrix::t(Z_mat)%*%Z+L2k)%*%mat_mult(Matrix::t(Z),Y)
     }
 
     Bdiff=sum((B-oldB)^2)/sum(B^2)
@@ -1022,7 +1083,7 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
 
     if(iter>52&&Bdiff>BdiffTrace[iter-50]){
       BdiffCount=BdiffCount+1
-      message("Bdiff is not decreasing")
+      # message("Bdiff is not decreasing")
     }
     else if(BdiffCount>1){
       BdiffCount=BdiffCount-1
@@ -1108,14 +1169,14 @@ projectPLIER = function(PLIERres, newdata, scale=1) {
     # FBM implementation - use big_cprodMat for efficient computation
     # But ensure Z is a standard matrix, not a Matrix package object
     ZYt = big_cprodMat(newdata, Z_matrix)
-    ZY = t(ZYt)
+    ZY = Matrix::t(ZYt)
   } else {
     # Standard matrix implementation - use regular matrix multiplication
-    ZY = t(Z_matrix) %*% newdata
+    ZY = Matrix::t(Z_matrix) %*% newdata
   }
 
   # Calculate the regularization matrix using standard matrix operations
-  ZtZ = t(Z_matrix) %*% Z_matrix
+  ZtZ = Matrix::t(Z_matrix) %*% Z_matrix
   L2k = PLIERres$L2 * diag(ncol(Z_matrix))*scale
 
   # Solve the regularized system

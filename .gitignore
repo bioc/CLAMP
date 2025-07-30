@@ -8,6 +8,9 @@ output/
 # Session Data files
 .RData
 .RDataTmp
+.Rbuildignore
+PLIER2.Rproj
+
 
 # User-specific files
 .Ruserdata
@@ -47,3 +50,7 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+
+#Scratch
+scratch/
