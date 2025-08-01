@@ -25,7 +25,6 @@ dependencies:
   - r-knitr
   - r-pkgdown
 
-
   # Jupyter support
   - jupyterlab
   - notebook
@@ -39,6 +38,7 @@ dependencies:
   - bioconductor-fgsea
   - bioconda::r-archr
   - bioconductor-org.Hs.eg.db
+  - bioconductor-ensdb.hsapiens.v86
 
   # Other R utilities
   - r-plyr
