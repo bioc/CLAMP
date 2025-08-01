@@ -44,8 +44,8 @@ compareBs<-function(res1, res2, target, method = "p", xlab="1", ylab="2", stat.m
   if (method %in% c("s", "p")) {
     mat1 <- cor(t(B1), target, method = method)
     mat2 <- cor(t(B2), target, method = method)
-    cor1 <- apply(mat1, 2, max)
-    cor2 <- apply(mat2, 2, max)
+    cor1 <- apply(mat1, 2, max, na.rm=T)
+    cor2 <- apply(mat2, 2, max, na.rm=T)
     idx1 <- apply(mat1, 2, which.max)
     idx2 <- apply(mat2, 2, which.max)
   } else if (method == "a") {
@@ -183,18 +183,29 @@ max_correspondence_greedy <- function(cor_mat) {
 #'
 #' @return A named list where each element is a character vector of gene names for a given gene set.
 #' @export
-getGMT <- function(url) {
-
-  tmp_file <- tempfile(fileext = ".gmt")
-
-  download.file(url, tmp_file)
-
-  result <- read_gmt(tmp_file)
-
-  unlink(tmp_file)
-
-  return(result)
+#'
+getGMT <- function(url, name = NULL, cache_dir = NULL, redownload = FALSE) {
+if (is.null(name)) {
+  name <- sub(".*[=]", "", url)
+  message("Auto-detected name: ", name)
 }
+if (is.null(cache_dir)) {
+  cache_dir <- system.file("extdata", package = "PLIER2")
+}
+cache_file <- file.path(cache_dir, paste0(name, ".gmt"))
+if (!file.exists(cache_file) || redownload) {
+  message("Downloading ", name, " from Enrichr...")
+  if (!dir.exists(cache_dir)) dir.create(cache_dir, recursive = TRUE)
+  download.file(url, cache_file)
+} else {
+  message("Using cached file for ", name)
+}
+read_gmt(cache_file)
+}
+
+
+
+
 
 #' Read a GMT file into a list
 #'
@@ -488,7 +499,7 @@ preprocessPLIER2FBM <- function(fbm,
                                 backingfile = NULL) {
   # 1. Choose base names
   base_bk <- if (is.null(backingfile)) paste0(fbm$backingfile, "_preproc") else backingfile
-  
+
   # 2. Make a writable copy
   fbm_copy <- FBM(
     nrow        = nrow(fbm),
@@ -498,13 +509,13 @@ preprocessPLIER2FBM <- function(fbm,
   )
   # copy all data
   fbm_copy[] <- fbm[]
-  
+
   # 3. Clean in-place (log2 if needed, fill NAs)
   cleanFBM(fbm_copy)
-  
+
   # 4. Compute row stats on cleaned copy
   rs_all <- computeRowStatsFBM(fbm_copy)
-  
+
   # 5. Filter rows, writing to a new filtered FBM
   filt_bk <- paste0(base_bk, "_filtered")
   filter_res <- filterFBM(
@@ -516,13 +527,13 @@ preprocessPLIER2FBM <- function(fbm,
   )
   fbm_filtered <- filter_res$fbm_filtered
   kept_rows    <- filter_res$kept_rows
-  
+
   # 6. Subset stats to kept rows
   stats_filt <- list(
     row_means     = rs_all$row_means[kept_rows],
     row_variances = rs_all$row_variances[kept_rows]
   )
-  
+
   list(
     fbm_filtered = fbm_filtered,
     rowStats     = stats_filt,
@@ -543,7 +554,7 @@ zscorePLIER2FBM <- function(fbm_filtered, rowStats, chunk_size = 1000) {
   means <- rowStats$row_means
   sds   <- sqrt(rowStats$row_variances)
   sds[sds == 0] <- 1
-  
+
   for (start in seq(1, ncol(fbm_filtered), by = chunk_size)) {
     end <- min(start + chunk_size - 1, ncol(fbm_filtered))
     mat <- fbm_filtered[, start:end]
@@ -551,7 +562,7 @@ zscorePLIER2FBM <- function(fbm_filtered, rowStats, chunk_size = 1000) {
     mat <- sweep(mat, 1, sds,   FUN = "/")
     fbm_filtered[, start:end] <- mat
   }
-  
+
   invisible(NULL)
 }
 
@@ -577,24 +588,24 @@ preprocessPLIER2 <- function(Y, mean_cutoff = 0, var_cutoff = 0) {
   # Compute per‐gene statistics
   row_mean <- rowMeans(Y, na.rm = TRUE)
   row_var  <- apply(Y, 1, stats::var,  na.rm = TRUE)
-  
+
   rowStats <- data.frame(
     mean     = row_mean,
     variance = row_var,
     stringsAsFactors = FALSE
   )
   rownames(rowStats) <- rownames(Y)
-  
+
   # Identify genes passing both thresholds
   keep <- which(rowStats$mean >= mean_cutoff & rowStats$variance >= var_cutoff)
   if (length(keep) == 0) {
     stop("No genes passed the mean/variance filters.")
   }
-  
+
   # Subset matrix and stats
   Y_filtered       <- Y[keep, , drop = FALSE]
   rowStats_filtered <- rowStats[keep, , drop = FALSE]
-  
+
   return(list(
     Y_filtered = Y_filtered,
     rowStats   = rowStats_filtered,
