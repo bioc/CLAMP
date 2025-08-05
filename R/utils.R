@@ -1,13 +1,17 @@
 
 library(dplyr)
 
-
 #' Row-wise scaling (mean 0, sd 1)
 #'
 #' Standardize each row of a numeric matrix to have mean 0 and standard deviation 1.
 #'
 #' @param x A numeric matrix.
 #' @return A matrix of the same shape, with each row scaled independently.
+#' @examples
+#' # simple 3×3 matrix
+#' mat <- matrix(1:9, nrow = 3, byrow = TRUE)
+#' # each row will be centered and scaled
+#' tscale(mat)
 #' @export
 tscale <- function(x) {
   row_means <- rowMeans(x)
@@ -22,6 +26,22 @@ tscale <- function(x) {
 #' This function compares two sets of latent variable loadings (`res1`, `res2`) with respect to a binary or continuous
 #' target matrix. It computes the maximal association (e.g., correlation, t-statistic, or AUC) between each latent variable
 #' and each column in the target, and returns a paired comparison plot and summary.
+#' @examples
+#' # simulate two sets of 4 latent variables over 5 features
+#' set.seed(42)
+#' B1 <- matrix(rnorm(5 * 4), nrow = 5, ncol = 4)
+#' B2 <- matrix(rnorm(5 * 4), nrow = 5, ncol = 4)
+#' # a binary target matrix (5 features × 3 outcomes)
+#' target <- matrix(sample(0:1, 5 * 3, TRUE), nrow = 5, ncol = 3)
+#' # compare using Pearson correlation
+#' cmp <- compareBs(list(B = B1), list(B = B2), target, method = "p")
+#' # view the scatter plot
+#' print(cmp$plot)
+#' # inspect the summary data frame
+#' head(cmp$df)
+#'
+#' @importFrom ggplot2 geom_point geom_abline labs theme_minimal
+#' @importFrom ggrepel geom_text_repel
 #' @export
 compareBs<-function(res1, res2, target, method = "p", xlab="1", ylab="2", stat.method="t") {
   extract_B <- function(res) {
@@ -92,14 +112,17 @@ compareBs<-function(res1, res2, target, method = "p", xlab="1", ylab="2", stat.m
 
 }
 
-
 #' Print a concatenated message
 #'
 #' Wrapper around \code{message()} that pastes arguments together into a single string.
-#'
 #' @param ... Character strings to concatenate and print.
-#'
+#' @examples
+#' # prints "alpha beta gamma"
+#' mymessage("alpha", "beta", "gamma")
 #' @export
+mymessage <- function(...) {
+  message(paste(...))
+}
 mymessage <- function(...) {
   message(paste(...))
 }
@@ -113,6 +136,15 @@ mymessage <- function(...) {
 #' @param verbose Logical; if \code{TRUE}, prints counts of LVs exceeding AUC thresholds. Default is \code{FALSE}.
 #'
 #' @return A data frame with columns \code{LV index} and \code{max_AUC}.
+#'
+#' @examples
+#' # create a mock summary table for two LVs
+#' summary_df <- data.frame(
+#'   `LV index` = c(1, 1, 2, 2),
+#'   AUC        = c(0.65, 0.75, 0.85, 0.55)
+#' )
+#' # get the maximum AUC per LV
+#' getMaxAUC(summary_df)
 #'
 #' @export
 getMaxAUC=function(summary, verbose=F){
@@ -139,6 +171,15 @@ getMaxAUC=function(summary, verbose=F){
 #'
 #' @return A named numeric vector with counts for thresholds 0.7, 0.8, and 0.9.
 #'
+#' @examples
+#' # example summary table for 3 LVs
+#' summary_df <- data.frame(
+#'   `LV index` = c(1, 1, 2, 2, 3, 3),
+#'   AUC         = c(0.65, 0.75, 0.82, 0.78, 0.91, 0.89)
+#' )
+#' # count how many LVs exceed each threshold
+#' getAUCstats(summary_df)
+#'
 #' @export
 getAUCstats=function(summary){
   out=getMaxAUC(summary)
@@ -151,6 +192,24 @@ getAUCstats=function(summary){
 #' Finds a one-to-one assignment (permutation) between rows and columns of a square correlation matrix
 #' that maximizes the total correlation score, using a greedy algorithm.
 #'
+#' @param cor_mat A square numeric matrix of pairwise correlations (rows = items, cols = items).
+#' @return A list with components:
+#'   \describe{
+#'     \item{\code{permutation}}{Integer vector of length \code{nrow(cor_mat)}, where entry \code{i} 
+#'       gives the column assigned to row \code{i}.}
+#'     \item{\code{sum}}{Total sum of the selected correlations.}
+#'   }
+#' @examples
+#' cor_mat <- matrix(c(
+#'   1.0, 0.2, 0.4,
+#'   0.3, 1.0, 0.1,
+#'   0.5, 0.2, 1.0
+#' ), nrow = 3, byrow = TRUE)
+#' res <- max_correspondence_greedy(cor_mat)
+#' res$permutation
+#' res$sum
+#'
+#' @export
 max_correspondence_greedy <- function(cor_mat) {
   n <- nrow(cor_mat)
   used_rows <- rep(FALSE, n)
@@ -180,10 +239,24 @@ max_correspondence_greedy <- function(cor_mat) {
 #' and removes the temporary file afterward.
 #'
 #' @param url A character string specifying the URL to a GMT file.
+#' @param name Optional name for the GMT file (defaults to the portion after the last "=" in the URL).
+#' @param cache_dir Optional directory in which to cache/download the GMT file.
+#' @param redownload Logical; if \code{TRUE}, forces re-download even if cached.
 #'
 #' @return A named list where each element is a character vector of gene names for a given gene set.
-#' @export
 #'
+#' @examples
+#' \dontrun{
+#' # Example: download the KEGG 2019 Human GMT from Enrichr
+#' url <- "https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=KEGG_2019_Human"
+#' gmt_list <- getGMT(url)
+#' # list available gene sets
+#' names(gmt_list)
+#' # inspect the first few genes in the first gene set
+#' head(gmt_list[[1]])
+#' }
+#'
+#' @export
 getGMT <- function(url, name = NULL, cache_dir = NULL, redownload = FALSE) {
 if (is.null(name)) {
   name <- sub(".*[=]", "", url)
@@ -203,10 +276,6 @@ if (!file.exists(cache_file) || redownload) {
 read_gmt(cache_file)
 }
 
-
-
-
-
 #' Read a GMT file into a list
 #'
 #' Parses a local GMT file and returns a list of gene sets, with each gene set represented as
@@ -215,6 +284,14 @@ read_gmt(cache_file)
 #' @param filename A character string giving the path to a .gmt file.
 #'
 #' @return A named list where each element is a character vector of gene names.
+#' @examples
+#' # create a temporary GMT file
+#' tmp <- tempfile(fileext = ".gmt")
+#' writeLines(c(
+#'   "Set1\tDescription\tGeneA\tGeneB\tGeneA",
+#'   "Set2\tDescription\tGeneC\tGeneD"
+#' ), tmp)
+#' gmt_list <- read_gmt(tmp)
 #' @export
 read_gmt=function (filename) {
   gmt = list()
@@ -236,6 +313,21 @@ read_gmt=function (filename) {
 #' @param gmtList A nested list of gene sets. Outer names are gene set names; each entry is a character vector of gene names.
 #'
 #' @return A sparse binary matrix with genes as rows and gene sets as columns.
+#' @examples
+#' # define a simple nested GMT list
+#' gmt1 <- list(
+#'   PathwayA = c("Gene1", "Gene2", "Gene3"),
+#'   PathwayB = c("Gene2", "Gene4")
+#' )
+#' gmt2 <- list(
+#'   PathwayC = c("Gene1", "Gene4"),
+#'   PathwayD = c("Gene3", "Gene5")
+#' )
+#' # combine into a nested list
+#' nestedList <- list(gmt1 = gmt1, gmt2 = gmt2)
+#' # convert to sparse matrix
+#' sparseMat <- gmtListToSparseMat(nestedList)
+#' @importFrom Matrix sparseMatrix
 #' @export
 gmtListToSparseMat=function(gmtList){
 
@@ -278,11 +370,19 @@ gmtListToSparseMat=function(gmtList){
 #'
 #' @return A character vector of row names common to both inputs.
 #'
+#' @examples
+#' # create two matrices with overlapping row names
+#' m1 <- matrix(1:4, nrow = 2)
+#' rownames(m1) <- c("geneA", "geneB")
+#' m2 <- matrix(5:8, nrow = 2)
+#' rownames(m2) <- c("geneB", "geneC")
+#' # should return only the common row name "geneB"
+#' commonRows(m1, m2)
+#'
 #' @export
 commonRows=function(data1, data2){
   intersect(rownames(data1), rownames(data2))
 }
-
 
 #' Clean a Filebacked Big Matrix (FBM) by log-transforming and handling NAs
 #'
@@ -301,9 +401,19 @@ commonRows=function(data1, data2){
 #' @details
 #' Modifies the FBM in place. Uses \code{bigstatsr::big_apply()} to process in parallel-safe chunks.
 #'
+#' @examples
+#' \dontrun{
+#' library(bigstatsr)
+#' # create a small FBM with some large values and NAs
+#' fbm <- FBM(nrow = 5, ncol = 4, init = 1:20)
+#' fbm[1, 1] <- 200  # trigger log2 transformation
+#' fbm[2, 2] <- NA   # introduce an NA
+#' res <- cleanFBM(fbm)
+#'
+#' @importFrom bigstatsr big_apply rows_along FBM
 #' @export
 cleanFBM=function(fbm){
-  # Step 1: Check for NA and max value
+  # SCheck for NA and max value
   max_value <- -Inf
   has_na <- FALSE
 
@@ -315,7 +425,7 @@ cleanFBM=function(fbm){
     NULL  # No return, just updating global values
   }, ind = rows_along(fbm))
 
-  # Step 2: Log2 transform if necessary
+  # Log2 transform if necessary
   if (max_value >= 100) {
     message("Applying log2 transformation")
     big_apply(fbm, a.FUN = function(X, ind) {
@@ -326,7 +436,7 @@ cleanFBM=function(fbm){
     message("Already on log scale")
   }
 
-  # Step 3: Fill NAs with 0 if necessary
+  # Fill NAs with 0 if necessary
   if (has_na) {
     message("Filling NAs with 0")
     big_apply(fbm, a.FUN = function(X, ind) {
@@ -340,7 +450,6 @@ cleanFBM=function(fbm){
 
   return(list(max_value = max_value, had_na = has_na))
 }
-
 
 #' Compute row-wise sum and sum of squares for a Filebacked Big Matrix
 #'
@@ -443,9 +552,26 @@ filterFBM<- function(fbm, rowStats, mean_cutoff = NULL, var_cutoff = NULL, backi
 #'
 #' @return Numeric matrix of the same dimensions as `Y_filtered`, with each
 #'         row centered and scaled.
+#' @examples
+#' # simple 2 genes × 3 samples matrix
+#' Y <- matrix(c(
+#'   2, 4, 6,    # gene1 counts
+#'   8,10,12     # gene2 counts
+#' ), nrow = 2, byrow = TRUE,
+#' dimnames = list(c("gene1","gene2"), paste0("sample",1:3)))
+#'
+#' # compute per‐gene mean and variance
+#' rowStats <- data.frame(
+#'   mean     = rowMeans(Y),
+#'   variance = apply(Y, 1, var),
+#'   row.names = rownames(Y)
+#' )
+#'
+#' # z‐score each row
+#' Y_z <- zscorePLIER2(Y, rowStats)
 #' @export
 zscorePLIER2 <- function(Y_filtered, rowStats) {
-  # 1) Input validation
+  # Input validation
   if (!is.matrix(Y_filtered) || !is.numeric(Y_filtered)) {
     stop("`Y_filtered` must be a numeric matrix (genes × samples).")
   }
@@ -453,12 +579,12 @@ zscorePLIER2 <- function(Y_filtered, rowStats) {
       !all(c("mean", "variance") %in% colnames(rowStats))) {
     stop("`rowStats` must be a data.frame with columns 'mean' and 'variance'.")
   }
-  # 2) Align rowStats to Y_filtered
+  # Align rowStats to Y_filtered
   if (!all(rownames(Y_filtered) %in% rownames(rowStats))) {
     stop("Row names of `Y_filtered` and `rowStats` do not match.")
   }
   rowStats <- rowStats[rownames(Y_filtered), , drop = FALSE]
-  # 3) Ensure numeric
+  # Ensure numeric
   mu  <- as.numeric(rowStats$mean)
   var <- as.numeric(rowStats$variance)
   if (any(is.na(mu)) || any(is.na(var))) {
@@ -467,16 +593,15 @@ zscorePLIER2 <- function(Y_filtered, rowStats) {
   if (any(var <= 0)) {
     stop("All variances must be positive; zero or negative found.")
   }
-  # 4) Compute standard deviation
+  # Compute standard deviation
   sd  <- sqrt(var)
-  # 5) Center and scale
-  #    subtract mu from each row, then divide by sd
+  # Center and scale
+  # subtract mu from each row, then divide by sd
   Y_centered <- sweep(Y_filtered, 1L, mu,  "-")
   Y_scaled   <- sweep(Y_centered, 1L, sd,  "/")
-  # 6) Return
+  # Return
   return(Y_scaled)
 }
-
 
 #' Preprocess a bigstatsr FBM for PLIER2
 #'
@@ -492,15 +617,32 @@ zscorePLIER2 <- function(Y_filtered, rowStats) {
 #'   \item{fbm_filtered}{The filtered FBM (writable).}
 #'   \item{rowStats}{List with row_means & row_variances for fbm_filtered.}
 #'   \item{kept_rows}{Integer vector of original row indices that were retained.}
+#' @examples
+#' library(bigstatsr)
+#' # create a toy matrix and back it with an FBM
+#' mat <- matrix(c(
+#'   1,   2,   3,    # geneA
+#'   10, 20,  30,    # geneB
+#'   100,200,300     # geneC
+#' ), nrow = 3, byrow = TRUE,
+#' dimnames = list(c("geneA","geneB","geneC"), paste0("s", 1:3)))
+#' fbm <- FBM(nrow(mat), ncol(mat), init = mat)
+#'
+#' # preprocess without filtering (all genes kept)
+#' res_all <- preprocessPLIER2FBM(fbm)
+#' str(res_all)
+#'
+#' # preprocess with a mean filter to drop low‐expression genes
+#' res_filtered <- preprocessPLIER2FBM(fbm, mean_cutoff = 50)
 #' @export
 preprocessPLIER2FBM <- function(fbm,
                                 mean_cutoff = NULL,
                                 var_cutoff  = NULL,
                                 backingfile = NULL) {
-  # 1. Choose base names
+  # Choose base names
   base_bk <- if (is.null(backingfile)) paste0(fbm$backingfile, "_preproc") else backingfile
 
-  # 2. Make a writable copy
+  # Make a writable copy
   fbm_copy <- FBM(
     nrow        = nrow(fbm),
     ncol        = ncol(fbm),
@@ -510,13 +652,13 @@ preprocessPLIER2FBM <- function(fbm,
   # copy all data
   fbm_copy[] <- fbm[]
 
-  # 3. Clean in-place (log2 if needed, fill NAs)
+  # Clean in-place (log2 if needed, fill NAs)
   cleanFBM(fbm_copy)
 
-  # 4. Compute row stats on cleaned copy
+  # Compute row stats on cleaned copy
   rs_all <- computeRowStatsFBM(fbm_copy)
 
-  # 5. Filter rows, writing to a new filtered FBM
+  # Filter rows, writing to a new filtered FBM
   filt_bk <- paste0(base_bk, "_filtered")
   filter_res <- filterFBM(
     fbm_copy,
@@ -528,7 +670,7 @@ preprocessPLIER2FBM <- function(fbm,
   fbm_filtered <- filter_res$fbm_filtered
   kept_rows    <- filter_res$kept_rows
 
-  # 6. Subset stats to kept rows
+  # Subset stats to kept rows
   stats_filt <- list(
     row_means     = rs_all$row_means[kept_rows],
     row_variances = rs_all$row_variances[kept_rows]
@@ -576,10 +718,23 @@ zscorePLIER2FBM <- function(fbm_filtered, rowStats, chunk_size = 1000) {
 #' @param var_cutoff  Numeric. Minimum row-variance required to keep a gene (default 0).
 #'
 #' @return A list with components:
-#'   - **fbm_filtered**: filtered matrix (genes × samples)
+#'   - **Y_filtered**: filtered matrix (genes × samples)
 #'   - **rowStats**: data.frame with columns `mean` and `variance` for each kept gene
 #'   - **kept_rows**: integer vector of the original row indices that were kept
 #'
+#' @examples
+#' # construct a small example matrix
+#' mat <- matrix(
+#'   c(1, 5, 10,
+#'     2, 6, 11,
+#'     3, 7, 12,
+#'     4, 8, 13),
+#'   nrow = 4, byrow = FALSE,
+#'   dimnames = list(paste0("gene", 1:4), paste0("sample", 1:3))
+#' )
+#'
+#' # keep genes with mean ≥ 6 and variance ≥ 2
+#' res <- preprocessPLIER2(mat, mean_cutoff = 6, var_cutoff = 2)
 #' @export
 preprocessPLIER2 <- function(Y, mean_cutoff = 0, var_cutoff = 0) {
   if (!is.matrix(Y) || !is.numeric(Y)) {
@@ -638,9 +793,21 @@ cpmPLIER2 <- function(counts) {
 #' @param block_size Numeric; rows per block (default 1000).
 #' @return Invisibly returns the modified FBM (now holding CPM values).
 #' @examples
-#' # fbm <- FBM(1000, 10, backingfile="raw", backingpath=".")
-#' # … fill fbm with counts …
-#' cpmPLIER2FBM(fbm)
+#' library(bigstatsr)
+#'
+#' # small 2 genes × 3 samples count matrix
+#' mat <- matrix(
+#'   c(10, 20, 30,
+#'     40, 50, 60),
+#'   nrow = 2, byrow = FALSE,
+#'   dimnames = list(c("gene1", "gene2"), paste0("sample", 1:3))
+#' )
+#'
+#' # create an FBM initialized with counts
+#' fbm <- FBM(nrow(mat), ncol(mat), init = mat)
+#'
+#' # convert counts to CPM in-place
+#' cpmPLIER2FBM(fbm, block_size = 1)
 #' @export
 cpmPLIER2FBM <- function(fbm_counts, block_size = 1000) {
   if (!inherits(fbm_counts, "FBM")) {
@@ -650,13 +817,13 @@ cpmPLIER2FBM <- function(fbm_counts, block_size = 1000) {
   n_c <- ncol(fbm_counts)
   lib_sizes <- numeric(n_c)
   
-  # 1) compute library sizes
+  # compute library sizes
   for (rs in seq(1, n_r, by = block_size)) {
     rows <- rs:min(rs + block_size - 1, n_r)
     lib_sizes <- lib_sizes + colSums(fbm_counts[rows, , drop = FALSE])
   }
   
-  # 2) in-place CPM
+  # in-place CPM
   for (rs in seq(1, n_r, by = block_size)) {
     rows <- rs:min(rs + block_size - 1, n_r)
     block <- fbm_counts[rows, , drop = FALSE]
