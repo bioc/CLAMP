@@ -12,7 +12,6 @@ library(dplyr)
 #' mat <- matrix(1:9, nrow = 3, byrow = TRUE)
 #' # each row will be centered and scaled
 #' tscale(mat)
-#' @export
 tscale <- function(x) {
   row_means <- rowMeans(x)
   row_sds <- sqrt(rowMeans((x - row_means)^2))
@@ -42,7 +41,6 @@ tscale <- function(x) {
 #'
 #' @importFrom ggplot2 geom_point geom_abline labs theme_minimal
 #' @importFrom ggrepel geom_text_repel
-#' @export
 compareBs<-function(res1, res2, target, method = "p", xlab="1", ylab="2", stat.method="t") {
   extract_B <- function(res) {
     if (class(res)[1] == "list") {
@@ -119,7 +117,6 @@ compareBs<-function(res1, res2, target, method = "p", xlab="1", ylab="2", stat.m
 #' @examples
 #' # prints "alpha beta gamma"
 #' mymessage("alpha", "beta", "gamma")
-#' @export
 mymessage <- function(...) {
   message(paste(...))
 }
@@ -137,7 +134,6 @@ mymessage <- function(...) {
 #'
 #' @return A data frame with columns \code{LV index} and \code{max_AUC}.
 #'
-#' @examples
 #' # create a mock summary table for two LVs
 #' summary_df <- data.frame(
 #'   `LV index` = c(1, 1, 2, 2),
@@ -171,7 +167,6 @@ getMaxAUC=function(summary, verbose=F){
 #'
 #' @return A named numeric vector with counts for thresholds 0.7, 0.8, and 0.9.
 #'
-#' @examples
 #' # example summary table for 3 LVs
 #' summary_df <- data.frame(
 #'   `LV index` = c(1, 1, 2, 2, 3, 3),
@@ -199,7 +194,6 @@ getAUCstats=function(summary){
 #'       gives the column assigned to row \code{i}.}
 #'     \item{\code{sum}}{Total sum of the selected correlations.}
 #'   }
-#' @examples
 #' cor_mat <- matrix(c(
 #'   1.0, 0.2, 0.4,
 #'   0.3, 1.0, 0.1,
@@ -292,7 +286,6 @@ read_gmt(cache_file)
 #'   "Set2\tDescription\tGeneC\tGeneD"
 #' ), tmp)
 #' gmt_list <- read_gmt(tmp)
-#' @export
 read_gmt=function (filename) {
   gmt = list()
   lines = readLines(filename)
@@ -379,7 +372,6 @@ gmtListToSparseMat=function(gmtList){
 #' # should return only the common row name "geneB"
 #' commonRows(m1, m2)
 #'
-#' @export
 commonRows=function(data1, data2){
   intersect(rownames(data1), rownames(data2))
 }
@@ -401,7 +393,6 @@ commonRows=function(data1, data2){
 #' @details
 #' Modifies the FBM in place. Uses \code{bigstatsr::big_apply()} to process in parallel-safe chunks.
 #'
-#' @examples
 #' \dontrun{
 #' library(bigstatsr)
 #' # create a small FBM with some large values and NAs
@@ -465,7 +456,6 @@ cleanFBM=function(fbm){
 #'   \item{\code{row_sums_sq}}{Sum of squares of each row.}
 #' }
 #'
-#' @export
 computeRowStatsFBM <- function(fbm, chunk_size = 1000) {
   n_rows <- nrow(fbm)
   n_cols <- ncol(fbm)
@@ -512,7 +502,6 @@ computeRowStatsFBM <- function(fbm, chunk_size = 1000) {
 #' @details
 #' This function creates a new FBM and copies over only the rows that pass the filtering criteria.
 #' The original FBM is unchanged.
-#' @export
 filterFBM<- function(fbm, rowStats, mean_cutoff = NULL, var_cutoff = NULL, backingfile = "filtered_fbm") {
   row_means <- rowStats$row_means
   row_variances <- rowStats$row_variances

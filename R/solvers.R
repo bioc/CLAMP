@@ -27,7 +27,6 @@ library(glmnet)
 #' # a simple vector of p-values
 #' pvals <- c(0.01, 0.20, 0.50, 0.001)
 #' BH(pvals)
-#' @export
 BH <-function(p){p.adjust(p, method="BH")}
 
 #' Row-wise correlation between two matrices
@@ -42,7 +41,6 @@ BH <-function(p){p.adjust(p, method="BH")}
 #' A <- matrix(rnorm(12), nrow = 3)
 #' B <- A + matrix(rnorm(12, sd = 0.1), nrow = 3)
 #' cors <- row_cor(A, B)
-#' @export
 row_cor <- function(A, B) {
   A_mat <- as.matrix(A)
   B_mat <- as.matrix(B)
@@ -67,7 +65,6 @@ row_cor <- function(A, B) {
 #' M1 <- matrix(1:6, nrow = 2)
 #' M2 <- matrix(1:6, ncol = 1)
 #' mat_mult(M1, M2)
-#' @export
 mat_mult <- function(mat1, mat2) {
   is_fbm <- inherits(mat1, "FBM")
   if (is_fbm ) {
@@ -95,7 +92,6 @@ mat_mult <- function(mat1, mat2) {
 #' # small positive-definite matrix
 #' M <- crossprod(matrix(rnorm(16), nrow = 4))
 #' invM <- pinv.ridge(M, alpha = 0.1)
-#' @export
 pinv.ridge <- function(m, alpha = 0) {
   msvd <- svd(m)
   d <- msvd$d
@@ -126,7 +122,6 @@ pinv.ridge <- function(m, alpha = 0) {
 #' sums_before <- colSums(svd0$u)
 #' # apply rotateSVD
 #' svd1 <- rotateSVD(svd0)
-#' @export
 rotateSVD=function(svdres){
   upos=svdres$u
   uneg=svdres$u
@@ -146,7 +141,6 @@ rotateSVD=function(svdres){
   svdres
 }
 
-
 #' Binarize matrix by top-k values per column
 #'
 #' Keeps only the top \code{top} values in each column of a matrix, setting others to 0.
@@ -159,7 +153,6 @@ rotateSVD=function(svdres){
 #' M <- matrix(1:12, nrow = 3)
 #' # keep top 2 entries per column, set others to zero
 #' binarizeTop(M, top = 2)
-#' @export
 binarizeTop=function(Z, top, keepVals=T){
   for(i in 1:ncol(Z)){
     cutoff=sort(Z[,i],T)[top+1]
@@ -219,7 +212,6 @@ binarizeTop=function(Z, top, keepVals=T){
 #'
 #' @importFrom glmnet glmnet cv.glmnet
 #' @importFrom Matrix crossprod
-#' @export
 
 solveU=function(Z,  Chat=NULL, priorMat, penalty.factor,pathwaySelection="fast", alpha=0.9,
                 maxPath=10,  nfolds=5,  useSE=F, top=NULL, binary=F,
@@ -398,8 +390,6 @@ getChat <- function(priorMat, scale = TRUE) {
   Chat
 }
 
-
-
 #' Subset and filter multiple pathway matrices to match target genes
 #'
 #' Filters gene-by-pathway annotation matrices to retain only pathways
@@ -478,7 +468,6 @@ getMatchedPathwayMat2 <- function(..., new.genes, min.genes = 10) {
 #' new.genes <- c("g1","g2","g3","g4","g5")
 #' # require at least 2 overlapping genes per pathway
 #' out <- getMatchedPathwayMatOld(pathMat, new.genes, min.genes = 2)
-#' @export
 getMatchedPathwayMatOld <- function(pathMat, new.genes, min.genes = 10) {
   cm <- intersect(rownames(pathMat), new.genes)
   mymessage("There are ", length(cm), " genes in the intersection between data and prior")
@@ -523,7 +512,6 @@ getMatchedPathwayMatOld <- function(pathMat, new.genes, min.genes = 10) {
 #' result$auc
 #' result$pval
 #'
-#' @export
 AUC <- function(labels, values) {
   pos <- labels > 0
   neg <- !pos
@@ -575,7 +563,6 @@ AUC <- function(labels, values) {
 #' # inspect the summary table
 #' head(res$summary)
 #'
-#' @export
 crossVal<-function(plierRes,priorMat, priorMatcv){
 
   out=matrix(ncol=4, nrow=0)
@@ -1284,7 +1271,6 @@ projectPLIER = function(PLIERres, newdata, scale=1) {
 #' # estimate the “elbow” point
 #' run_elbow(d)
 #'
-#' @export
 run_elbow <- function(d) {
   # compute second differences
   x_raw <- abs(diff(diff(d)))
@@ -1310,7 +1296,6 @@ run_elbow <- function(d) {
 #' # use fewer permutations for speed
 #' run_permutation(M, d, B = 5)
 #'
-#' @export
 run_permutation <- function(data, d, B = 20) {
   k <- length(d)
   # observed proportions
