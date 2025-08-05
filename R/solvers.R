@@ -389,6 +389,52 @@ getChat <- function(priorMat, scale = TRUE) {
   message("done")
   Chat
 }
+#' Subset and filter pathway matrix to match target genes
+#'
+#' Filters a gene-by-pathway annotation matrix to retain only pathways
+#' with sufficient overlap with a given gene set. The result is a sparse matrix
+#' aligned to \code{new.genes}, with columns (pathways) retained only if they
+#' have at least \code{min.genes} matched genes.
+#'
+#' @param pathMat A sparse binary matrix of genes (rows) × pathways (columns).
+#' @param new.genes Character vector of gene names to match.
+#' @param min.genes Minimum number of overlapping genes required to keep a pathway.
+#'
+#' @return A sparse matrix of dimensions \code{length(new.genes)} × filtered pathways.
+#' @examples
+#' library(Matrix)
+#' # create a toy gene-by-pathway sparse matrix
+#' genes    <- paste0("g", 1:6)
+#' pathways <- c("Path1", "Path2", "Path3")
+#' # Path1: g1, g2; Path2: g2, g3, g4; Path3: g5
+#' pathMat <- sparseMatrix(
+#'   i = c(1, 2, 2, 3, 4, 5),
+#'   j = c(1, 1, 2, 2, 2, 3),
+#'   dims     = c(length(genes), length(pathways)),
+#'   dimnames = list(genes, pathways)
+#' )
+#' new.genes <- genes
+#' filtered <- getMatchedPathwayMat(pathMat, new.genes, min.genes = 2)
+#' @export
+getMatchedPathwayMat <- function(pathMat, new.genes, min.genes = 10) {
+  cm <- intersect(rownames(pathMat), new.genes)
+  mymessage("there are ", length(cm), " genes in the intersection between data and prior")
+
+  matchPathMat <- Matrix::sparseMatrix(
+    i = match(cm, new.genes),
+    j = rep(1, length(cm)),  # temporary, will be overwritten below
+    dims = c(length(new.genes), ncol(pathMat)),
+    x = 0,  # fill with zeros for now
+    dimnames = list(new.genes, colnames(pathMat))
+  )
+  matchPathMat[cm, ] <- pathMat[cm, ]
+
+  genesInPath <- Matrix::colSums(matchPathMat)
+  ii <- which(genesInPath >= min.genes)
+  message(sprintf("Removing %d pathways", ncol(matchPathMat) - length(ii)))
+
+  matchPathMat[, ii]
+}
 
 #' Subset and filter multiple pathway matrices to match target genes
 #'
