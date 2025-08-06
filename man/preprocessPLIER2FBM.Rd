@@ -44,7 +44,4 @@ fbm <- FBM(nrow(mat), ncol(mat), init = mat)
 
 # preprocess without filtering (all genes kept)
 res_all <- preprocessPLIER2FBM(fbm)
-str(res_all)
-# preprocess with a mean filter to drop low‐expression genes
-res_filtered <- preprocessPLIER2FBM(fbm, mean_cutoff = 50)
 }

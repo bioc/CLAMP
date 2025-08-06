@@ -557,12 +557,6 @@ zscorePLIER2 <- function(Y_filtered, rowStats) {
 #'
 #' # preprocess without filtering (all genes kept)
 #' res_all <- preprocessPLIER2FBM(fbm)
-#' str(res_all)
-#’ unlink(paste0(res_all$fbm_filtered$bk), recursive = FALSE)
-#’ unlink(sub("\\.bk$", ".rds", res_all$fbm_filtered$bk))
-
-#' # preprocess with a mean filter to drop low‐expression genes
-#' res_filtered <- preprocessPLIER2FBM(fbm, mean_cutoff = 50)
 #' @export
 preprocessPLIER2FBM <- function(fbm,
                                 mean_cutoff = NULL,
