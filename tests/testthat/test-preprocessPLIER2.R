@@ -1,5 +1,3 @@
-context("preprocessPLIER2")
-
 test_that("preprocessPLIER2 filters and returns correct structure", {
   Y <- matrix(rnorm(100), 10, 10)
   out <- preprocessPLIER2(Y = Y, mean_cutoff = 0, var_cutoff = 0)

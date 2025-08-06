@@ -37,6 +37,12 @@ library(Matrix)
 library(AnnotationDbi)
 library(org.Hs.eg.db)
 library(DT)
+
+ext <- system.file("extdata", package = "PLIER2")
+out_dir <- rappdirs::user_cache_dir("PLIER2")
+dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
+
+ext
 ```
 
 ```{r logo, echo=FALSE, eval=TRUE, out.width='40%'}
@@ -305,7 +311,7 @@ For file-backed matrices (FBMs), you can compute counts-per-million (CPM) in-pla
 ## 2. Load HDF5 expression
 
 ```{r hdf5-load, message=FALSE}
-alz_path <- here('data/get_started/human_gene_v2.5_alz.h5')
+alz_path   <- file.path(ext, 'get_started', "human_gene_v2.5_alz.h5")
 h5 <- H5File$new(alz_path, mode = "r")
 expr_mat <- t(h5[["data/expression"]]$read())
 genes <- h5[["meta/genes/symbol"]]$read()
@@ -433,8 +439,10 @@ In this example, we apply the in‑memory PLIER2 workflow to RNA‑Seq count dat
 ## 1. Load count data and map gene symbols
 
 ```{r islet-load, message=FALSE}
+islet_file <- file.path(ext, 'get_started', "GSE164416_DP_htseq_counts.txt")
+
 islet_df <- read.table(
-  here('data/get_started/GSE164416_DP_htseq_counts.txt'),
+  islet_file,
   header = TRUE, stringsAsFactors = FALSE
 )
 
@@ -572,7 +580,9 @@ Rows of the B matrix correspond to LVs and columns to samples. By grouping sampl
 B_df <- as.data.frame(as.matrix(islet_fullRes$B)) %>%
   dplyr::mutate(LV = rownames(.))
 
-iselt_metadata <- read.csv(here('data/get_started/islets_metadata.csv'), header = TRUE)
+islet_meta <- file.path(ext, 'get_started', "islets_metadata.csv")
+
+iselt_metadata <- read.csv(islet_meta, header = TRUE)
 
 sample_types <- iselt_metadata %>%
   dplyr::mutate(

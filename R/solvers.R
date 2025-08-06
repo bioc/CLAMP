@@ -23,10 +23,6 @@ library(glmnet)
 #'
 #' @param p Numeric vector of p-values.
 #' @return Adjusted p-values.
-#' @examples
-#' # a simple vector of p-values
-#' pvals <- c(0.01, 0.20, 0.50, 0.001)
-#' BH(pvals)
 BH <-function(p){p.adjust(p, method="BH")}
 
 #' Row-wise correlation between two matrices
@@ -36,11 +32,6 @@ BH <-function(p){p.adjust(p, method="BH")}
 #' @param A A numeric matrix.
 #' @param B A numeric matrix of the same dimensions as \code{A}.
 #' @return A numeric vector of correlations, one per row.
-#' @examples
-#' set.seed(1)
-#' A <- matrix(rnorm(12), nrow = 3)
-#' B <- A + matrix(rnorm(12, sd = 0.1), nrow = 3)
-#' cors <- row_cor(A, B)
 row_cor <- function(A, B) {
   A_mat <- as.matrix(A)
   B_mat <- as.matrix(B)
@@ -61,10 +52,6 @@ row_cor <- function(A, B) {
 #' @param mat1 A matrix or an object of class \code{FBM}.
 #' @param mat2 A numeric matrix.
 #' @return Matrix product of \code{mat1} and \code{mat2}.
-#' @examples
-#' M1 <- matrix(1:6, nrow = 2)
-#' M2 <- matrix(1:6, ncol = 1)
-#' mat_mult(M1, M2)
 mat_mult <- function(mat1, mat2) {
   is_fbm <- inherits(mat1, "FBM")
   if (is_fbm ) {
@@ -88,10 +75,6 @@ mat_mult <- function(mat1, mat2) {
 #'        stabilizes the inversion by shrinking large singular values.
 #'
 #' @return A numeric matrix representing the ridge-regularized pseudoinverse of \code{m}.
-#' @examples
-#' # small positive-definite matrix
-#' M <- crossprod(matrix(rnorm(16), nrow = 4))
-#' invM <- pinv.ridge(M, alpha = 0.1)
 pinv.ridge <- function(m, alpha = 0) {
   msvd <- svd(m)
   d <- msvd$d
@@ -113,15 +96,6 @@ pinv.ridge <- function(m, alpha = 0) {
 #' @param svdres A list as returned by \code{svd()}, with components \code{u}, \code{d}, and \code{v}.
 #' @return A modified \code{svd}‐result list where each column of \code{$u} has been sign‐flipped
 #'   so that its entries sum to a nonnegative value; \code{$v} is flipped correspondingly.
-#' @examples
-#' set.seed(42)
-#' M <- matrix(rnorm(16), nrow = 4)
-#' # compute SVD
-#' svd0 <- svd(M)
-#' # before flipping, some u‐columns may sum negative
-#' sums_before <- colSums(svd0$u)
-#' # apply rotateSVD
-#' svd1 <- rotateSVD(svd0)
 rotateSVD=function(svdres){
   upos=svdres$u
   uneg=svdres$u
@@ -149,10 +123,6 @@ rotateSVD=function(svdres){
 #' @param top Number of top entries to keep in each column.
 #' @param keepVals If \code{TRUE}, retains original values above the cutoff; otherwise, sets them to 1.
 #' @return A modified matrix with only top entries retained per column.
-#' @examples
-#' M <- matrix(1:12, nrow = 3)
-#' # keep top 2 entries per column, set others to zero
-#' binarizeTop(M, top = 2)
 binarizeTop=function(Z, top, keepVals=T){
   for(i in 1:ncol(Z)){
     cutoff=sort(Z[,i],T)[top+1]
@@ -178,7 +148,7 @@ binarizeTop=function(Z, top, keepVals=T){
 #'
 #' @param Z A numeric matrix with features (rows) and samples (columns).
 #' @param Chat (Optional) Precomputed pseudo-inverse of \code{priorMat}; if \code{NULL}, it is calculated using ridge regularization.
-#' @param priorMat A numeric matrix with prior information (features × pathways).
+#' @param priorMat A numeric matrix with prior information (features x pathways).
 #' @param penalty.factor Optional penalty weights for features in \code{priorMat}.
 #' @param pathwaySelection Method to select candidate pathways: \code{"fast"} (default) or \code{"complete"}.
 #' @param alpha Elastic net mixing parameter (0 = ridge, 1 = lasso). Default is 0.9.
@@ -195,24 +165,11 @@ binarizeTop=function(Z, top, keepVals=T){
 #'
 #' @return A list with one element:
 #' \describe{
-#'   \item{\code{U}}{A matrix of loadings (features × components). Columns are named \code{LV1}, \code{LV2}, ...}
+#'   \item{\code{U}}{A matrix of loadings (features x components). Columns are named \code{LV1}, \code{LV2}, ...}
 #' }
 #'
 #' @importFrom glmnet glmnet cv.glmnet
 #' @importFrom Matrix crossprod
-#' @examples
-#' set.seed(1)
-#' # 4 features × 3 samples
-#' Z <- matrix(rnorm(4*3), nrow = 4, ncol = 3,
-#'             dimnames = list(paste0("g",1:4), paste0("s",1:3)))
-#' # random prior: 4 features × 5 pathways
-#' priorMat <- matrix(rbinom(4*5, 1, 0.5), nrow = 4, ncol = 5,
-#'                    dimnames = list(rownames(Z), paste0("p",1:5)))
-#' out <- solveU(Z, priorMat = priorMat)
-#'
-#' @importFrom glmnet glmnet cv.glmnet
-#' @importFrom Matrix crossprod
-
 solveU=function(Z,  Chat=NULL, priorMat, penalty.factor,pathwaySelection="fast", alpha=0.9,
                 maxPath=10,  nfolds=5,  useSE=F, top=NULL, binary=F,
                 nlambda=20, scale=T, refit=T, Uprev=NULL,...){
@@ -360,20 +317,19 @@ solveU=function(Z,  Chat=NULL, priorMat, penalty.factor,pathwaySelection="fast",
 #' based on a pseudo-inverse of the prior annotation matrix. Optionally standardizes the columns
 #' of \code{priorMat} before computing.
 #'
-#' @param priorMat A numeric or sparse matrix (features × pathways) containing prior annotations.
+#' @param priorMat A numeric or sparse matrix (features x pathways) containing prior annotations.
 #' @param scale Logical; if \code{TRUE} (default), standardizes the columns of \code{priorMat} before computing \code{Chat}.
 #'
-#' @return A numeric matrix \code{Chat} of dimensions (pathways × features).
+#' @return A numeric matrix \code{Chat} of dimensions (pathways x features).
 #' @examples
-#' # simple toy prior: 3 features × 2 pathways
+#' # simple toy prior: 3 features x 2 pathways
 #' priorMat <- matrix(c(1, 0, 1,
 #'                      0, 1, 0),
 #'                    nrow = 3, ncol = 2,
 #'                    dimnames = list(paste0("gene", 1:3),
 #'                                    paste0("path", 1:2)))
-#' # compute Chat (2 pathways × 3 features)
+#' # compute Chat (2 pathways x 3 features)
 #' Chat <- getChat(priorMat)
-#'
 #' @export
 getChat <- function(priorMat, scale = TRUE) {
   if (scale) {
@@ -396,11 +352,11 @@ getChat <- function(priorMat, scale = TRUE) {
 #' aligned to \code{new.genes}, with columns (pathways) retained only if they
 #' have at least \code{min.genes} matched genes.
 #'
-#' @param pathMat A sparse binary matrix of genes (rows) × pathways (columns).
+#' @param pathMat A sparse binary matrix of genes (rows) x pathways (columns).
 #' @param new.genes Character vector of gene names to match.
 #' @param min.genes Minimum number of overlapping genes required to keep a pathway.
 #'
-#' @return A sparse matrix of dimensions \code{length(new.genes)} × filtered pathways.
+#' @return A sparse matrix of dimensions \code{length(new.genes)} x filtered pathways.
 #' @examples
 #' library(Matrix)
 #' # create a toy gene-by-pathway sparse matrix
@@ -442,23 +398,11 @@ getMatchedPathwayMat <- function(pathMat, new.genes, min.genes = 10) {
 #' with sufficient overlap with a given gene set. The result is a sparse matrix
 #' aligned to \code{new.genes}, combining all inputs column-wise.
 #'
-#' @param ... One or more sparse binary matrices (genes × pathways).
+#' @param ... One or more sparse binary matrices (genes x pathways).
 #' @param new.genes Character vector of gene names to match.
 #' @param min.genes Minimum number of overlapping genes required to keep a pathway.
 #'
 #' @return A sparse matrix with rows = \code{new.genes} and columns = filtered pathways from all inputs.
-#' @examples
-#' library(Matrix)
-#' # create two toy pathway matrices
-#' m1 <- sparseMatrix(i = c(1,2,3), j = c(1,2,3), x = 1,
-#'                    dimnames = list(c("g1","g2","g3"), c("p1","p2","p3")))
-#' m2 <- sparseMatrix(i = c(2,3,4), j = c(1,2,1), x = 1,
-#'                    dimnames = list(c("g2","g3","g4"), c("q1","q2","q1")))
-#' new.genes <- c("g1","g2","g3","g4","g5")
-#' # keep pathways with at least 1 overlapping gene
-#' out <- getMatchedPathwayMat2(m1, m2, new.genes = new.genes, min.genes = 1)
-#'
-#' @export
 getMatchedPathwayMat2 <- function(..., new.genes, min.genes = 10) {
   pathMats <- list(...)
 
@@ -497,23 +441,11 @@ getMatchedPathwayMat2 <- function(..., new.genes, min.genes = 10) {
 #' aligned to \code{new.genes}, with columns (pathways) retained only if they
 #' have at least \code{min.genes} matched genes.
 #'
-#' @param pathMat A sparse binary matrix of genes (rows) × pathways (columns).
+#' @param pathMat A sparse binary matrix of genes (rows) x pathways (columns).
 #' @param new.genes Character vector of gene names to match.
 #' @param min.genes Minimum number of overlapping genes required to keep a pathway.
 #'
-#' @return A sparse matrix of dimensions \code{length(new.genes)} × filtered pathways.
-#' @examples
-#' library(Matrix)
-#' # toy pathway matrix: genes g1–g4, pathways p1–p3
-#' pathMat <- sparseMatrix(
-#'   i = c(1,2,3,4),
-#'   j = c(1,2,2,3),
-#'   x = 1,
-#'   dimnames = list(c("g1","g2","g3","g4"), c("p1","p2","p3"))
-#' )
-#' new.genes <- c("g1","g2","g3","g4","g5")
-#' # require at least 2 overlapping genes per pathway
-#' out <- getMatchedPathwayMatOld(pathMat, new.genes, min.genes = 2)
+#' @return A sparse matrix of dimensions \code{length(new.genes)} x filtered pathways.
 getMatchedPathwayMatOld <- function(pathMat, new.genes, min.genes = 10) {
   cm <- intersect(rownames(pathMat), new.genes)
   mymessage("There are ", length(cm), " genes in the intersection between data and prior")
@@ -538,7 +470,7 @@ getMatchedPathwayMatOld <- function(pathMat, new.genes, min.genes = 10) {
 #'
 #' Computes the area under the ROC curve (AUC) by applying a Wilcoxon rank-sum test
 #' between predicted values for positive and negative labels. This is equivalent to
-#' computing the Mann–Whitney U statistic.
+#' computing the Mann-Whitney U statistic.
 #'
 #' @param labels A numeric or logical vector indicating class labels. Values > 0 are treated as positive.
 #' @param values A numeric vector of prediction scores corresponding to \code{labels}.
@@ -548,16 +480,6 @@ getMatchedPathwayMatOld <- function(pathMat, new.genes, min.genes = 10) {
 #'   \item{\code{auc}}{Estimated AUC, or 0.5 if one class is missing}
 #'   \item{\code{pval}}{Wilcoxon test p-value, or \code{NA} if one class is missing}
 #' }
-#'
-#' @examples
-#' # simple binary labels and corresponding scores
-#' labels <- c(1, 0, 1, 0, 1)
-#' scores <- c(0.9, 0.2, 0.8, 0.1, 0.7)
-#' result <- AUC(labels, scores)
-#' # view the estimated AUC and p-value
-#' result$auc
-#' result$pval
-#'
 AUC <- function(labels, values) {
   pos <- labels > 0
   neg <- !pos
@@ -583,32 +505,15 @@ AUC <- function(labels, values) {
 #' held-out genes are selected and the AUC is computed using their scores in \code{plierRes$Z}.
 #'
 #' @param plierRes A list containing \code{U} (loadings) and \code{Z} (scores) from a PLIER model.
-#' @param priorMat A binary matrix (genes × pathways) indicating original pathway annotations.
+#' @param priorMat A binary matrix (genes x pathways) indicating original pathway annotations.
 #' @param priorMatcv A version of \code{priorMat} used to mask held-out annotations for cross-validation.
 #'
 #' @return A list with:
 #' \describe{
-#'   \item{\code{Uauc}}{Matrix of AUC values (pathways × LVs)}
-#'   \item{\code{Upval}}{Matrix of \code{-log10(p)} values (pathways × LVs)}
+#'   \item{\code{Uauc}}{Matrix of AUC values (pathways x LVs)}
+#'   \item{\code{Upval}}{Matrix of \code{-log10(p)} values (pathways x LVs)}
 #'   \item{\code{summary}}{Data frame with pathway, LV index, AUC, p-value, and FDR}
 #' }
-#'
-#' @examples
-#' library(Matrix)
-#' # simulate a small PLIER result with 3 genes × 2 LVs
-#' U <- sparseMatrix(i = c(1,2), j = c(1,2), x = 1, dims = c(3,2))
-#' Z <- matrix(rnorm(3*2), nrow = 3, ncol = 2)
-#' plierRes <- list(U = U, Z = Z)
-#' # create a binary prior matrix (3 genes × 2 pathways)
-#' priorMat <- matrix(c(1,0,1, 0,1,0), nrow = 3, ncol = 2)
-#' # mask out one gene in pathway 1 for cross‐validation
-#' priorMatcv <- priorMat
-#' priorMatcv[1,1] <- 0
-#' # run cross‐validation
-#' res <- crossVal(plierRes, priorMat, priorMatcv)
-#' # inspect the summary table
-#' head(res$summary)
-#'
 crossVal<-function(plierRes,priorMat, priorMatcv){
 
   out=matrix(ncol=4, nrow=0)
@@ -654,7 +559,7 @@ crossVal<-function(plierRes,priorMat, priorMatcv){
 #' It supports sparse, dense, and Filebacked Big Matrices (FBM) as input and includes options for
 #' adaptive sparsity, positive constraints, and regularization.
 #'
-#' @param Y Input gene expression matrix (genes × samples). Can be dense, sparse (\code{dgCMatrix}), or FBM.
+#' @param Y Input gene expression matrix (genes x samples). Can be dense, sparse (\code{dgCMatrix}), or FBM.
 #' @param k Number of latent variables.
 #' @param svdres Optional precomputed SVD result. If not supplied, it is computed internally.
 #' @param L1 L1 regularization strength for Z. Defaults to scaled singular value.
@@ -674,8 +579,8 @@ crossVal<-function(plierRes,priorMat, priorMatcv){
 #'
 #' @return A list with components:
 #' \describe{
-#'   \item{\code{B}}{Latent variable loadings (LVs × genes)}
-#'   \item{\code{Z}}{Latent variable scores (LVs × samples)}
+#'   \item{\code{B}}{Latent variable loadings (LVs x genes)}
+#'   \item{\code{Z}}{Latent variable scores (LVs x samples)}
 #'   \item{\code{Zraw}}{Raw Z matrix before thresholding}
 #'   \item{\code{L1}}{Final value of L1 used}
 #'   \item{\code{L2}}{Final value of L2 used}
@@ -687,7 +592,7 @@ crossVal<-function(plierRes,priorMat, priorMatcv){
 #' constraints on \code{Z}. Convergence is assessed via relative change in \code{B}.
 #'
 #' @examples
-#' # small toy dataset: 5 genes × 4 samples
+#' # small toy dataset: 5 genes x 4 samples
 #' Y <- matrix(rnorm(5 * 4), nrow = 5, ncol = 4)
 #' # run a single iteration for speed
 #' res <- PLIERbase(Y, k = 2, max.iter = 1, trace = FALSE)
@@ -857,8 +762,8 @@ PLIERbase=function(Y, k,svdres=NULL,  L1=NULL, L2=NULL,
 #' and prior pathway annotation matrix. This function performs latent variable decomposition
 #' guided by prior knowledge and includes optional cross-validation to evaluate pathway associations.
 #'
-#' @param Y Gene expression matrix (genes × samples). Can be dense, sparse (dgCMatrix), or FBM.
-#' @param priorMat Binary matrix (genes × pathways) representing prior annotations.
+#' @param Y Gene expression matrix (genes x samples). Can be dense, sparse (dgCMatrix), or FBM.
+#' @param priorMat Binary matrix (genes x pathways) representing prior annotations.
 #' @param svdres Optional SVD result used for initialization.
 #' @param plier.base.result Optional result from \code{PLIERbase()} to initialize B.
 #' @param k Number of latent variables. If \code{NULL}, estimated from SVD.
@@ -887,18 +792,19 @@ PLIERbase=function(Y, k,svdres=NULL,  L1=NULL, L2=NULL,
 #' @param useNNLS If \code{TRUE}, uses non-negative least squares in U estimation. Default is \code{TRUE}.
 #' @param useRaw If \code{TRUE}, uses unthresholded Z for solving U. Default is \code{TRUE}.
 #' @param refitAll If \code{TRUE}, refits all U columns every update. Default is \code{FALSE}.
+#' @param useSE Logical; passed to the internal \code{solveU()} call. If \code{TRUE}, enables standard-error–aware selection when fitting U (pathway coefficients). Default is \code{FALSE}.
 #'
 #' @return A list with the following components:
 #' \describe{
-#'   \item{\code{B}}{Latent variable loadings (LVs × genes)}
-#'   \item{\code{Z}}{Latent variable matrix (LVs × samples)}
-#'   \item{\code{U}}{Pathway loadings matrix (pathways × LVs)}
+#'   \item{\code{B}}{Latent variable loadings (LVs x genes)}
+#'   \item{\code{Z}}{Latent variable matrix (LVs x samples)}
+#'   \item{\code{U}}{Pathway loadings matrix (pathways x LVs)}
 #'   \item{\code{C}}{Masked prior matrix used for training}
 #'   \item{\code{L1}, \code{L2}}{Regularization parameters}
 #'   \item{\code{heldOutGenes}}{List of held-out genes per pathway (if CV is enabled)}
 #'   \item{\code{Uauc}}{AUC matrix from CV evaluation (if enabled)}
 #'   \item{\code{Up}}{-\code{log10(p)} values from CV evaluation (if enabled)}
-#'   \item{\code{summary}}{Data frame of AUC, p-values, and FDR per pathway × LV (if enabled)}
+#'   \item{\code{summary}}{Data frame of AUC, p-values, and FDR per pathway x LV (if enabled)}
 #'   \item{\code{priorMatCV}}{Masked prior matrix used during CV}
 #'   \item{\code{priorMat}}{Final filtered prior matrix}
 #'   \item{\code{withPrior}}{Indices of LVs with non-zero pathway loadings}
@@ -911,18 +817,13 @@ PLIERbase=function(Y, k,svdres=NULL,  L1=NULL, L2=NULL,
 #' is used to hold out gene annotations in \code{priorMat} and evaluate latent variable specificity.
 #'
 #' @examples
-#' # small toy dataset: 5 genes × 4 samples
-#' Y <- matrix(rnorm(5 * 4), nrow = 5, ncol = 4)
-#' # simple binary prior: 5 genes × 3 pathways
-#' priorMat <- matrix(sample(0:1, 15, TRUE), nrow = 5, ncol = 3)
-#' # run a single iteration (fast) without cross‐validation
-#' res <- PLIERfull(Y, priorMat,
-#'                  k = 2,
-#'                  max.iter = 1,
-#'                  trace = FALSE,
-#'                  doCrossval = FALSE)
-#' # inspect top‐level components
-#' names(res)
+#' mat <- matrix(rnorm(100), 10, 10)
+#' svdres <- rsvd::rsvd(mat, k = 5)
+#' base <- PLIERbase(Y = mat, k = 5, svdres = svdres, trace = FALSE)
+#' priorMat <- matrix(1, nrow(mat), 5)
+#' full <- PLIERfull(Y = mat, priorMat = priorMat, svdres = svdres,
+#'                   plier.base.result = base, k = 5,
+#'                   doCrossval = FALSE, trace = FALSE, max.U.updates = 0)
 #' @export
 PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NULL, L2=NULL, top=NULL,
                    cvn=5, max.iter=350, trace=F, Chat=NULL, maxPath=10, doCrossval=T,
@@ -1252,11 +1153,11 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
 #' new datasets with matched genes.
 #'
 #' @param PLIERres A result object from \code{PLIERfull()} or \code{PLIERbase()}, containing at least \code{Z} and \code{L2}.
-#' @param newdata A gene expression matrix (genes × samples) to be projected. Must have the same genes (rows) as \code{PLIERres$Z}.
+#' @param newdata A gene expression matrix (genes x samples) to be projected. Must have the same genes (rows) as \code{PLIERres$Z}.
 #'        Can be a standard matrix, sparse matrix, or FBM/big.matrix.
 #' @param scale Optional numeric multiplier for the L2 regularization terms. Default is 1.
 #'
-#' @return A matrix \code{B} of projected latent loadings (LVs × samples) for the new dataset.
+#' @return A matrix \code{B} of projected latent loadings (LVs x samples) for the new dataset.
 #'
 #' @details
 #' This function uses ridge-regularized least squares to compute \code{B = solve(ZᵗZ + L2·I) · ZᵗY}, where
@@ -1270,7 +1171,7 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
 #' # new data with same 5 genes
 #' newY <- matrix(rnorm(5*2), nrow = 5)
 #' projB <- projectPLIER(base, newdata = newY)
-#' # check dimensions: 2 latent vars × 2 samples
+#' # check dimensions: 2 latent vars x 2 samples
 #' dim(projB)
 #'
 #' @export
@@ -1309,14 +1210,6 @@ projectPLIER = function(PLIERres, newdata, scale=1) {
 #'
 #' @param d Vector of singular values
 #' @return Estimated number of PCs via elbow
-#' 
-#' @examples
-#' # generate a random matrix and compute its singular values
-#' mat <- matrix(rnorm(50), nrow = 5)
-#' d <- svd(mat)$d
-#' # estimate the “elbow” point
-#' run_elbow(d)
-#'
 run_elbow <- function(d) {
   # compute second differences
   x_raw <- abs(diff(diff(d)))
@@ -1334,14 +1227,6 @@ run_elbow <- function(d) {
 #' @param d Vector of singular values
 #' @param B Number of permutations
 #' @return Estimated number of PCs via permutation test
-#' 
-#' @examples
-#' # small toy data: 4 genes × 6 samples
-#' M <- matrix(rnorm(4 * 6), nrow = 4)
-#' d <- svd(M)$d
-#' # use fewer permutations for speed
-#' run_permutation(M, d, B = 5)
-#'
 run_permutation <- function(data, d, B = 20) {
   k <- length(d)
   # observed proportions
@@ -1371,7 +1256,7 @@ run_permutation <- function(data, d, B = 20) {
 #' @param seed    Seed for reproducibility.
 #' @return        Estimated number of PCs.
 #' @examples
-#' # generate a small random matrix: 5 features × 10 samples
+#' # generate a small random matrix: 5 features x 10 samples
 #' mat <- matrix(rnorm(5 * 10), nrow = 5)
 #' # fast elbow estimate
 #' num.pc(mat, method = "elbow")
@@ -1413,6 +1298,3 @@ num.pc <- function(data, method = c("elbow", "permutation"), B = 20, seed = NULL
     run_elbow(uu$d)
   }
 }
-
-
-

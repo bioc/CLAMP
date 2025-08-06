@@ -1,9 +1,6 @@
-library(testthat)
-library(bigstatsr)
-
 test_that("cpmPLIER2FBM computes CPM in‐place on an FBM", {
   mat <- matrix(c(1,3,2,4), nrow = 2)
-  fbm <- FBM(nrow(mat), ncol(mat), init = mat)
+  fbm <- bigstatsr::FBM(nrow(mat), ncol(mat), init = mat)
   lib <- colSums(mat)
   expected <- sweep(mat, 2, lib, "/") * 1e6
 

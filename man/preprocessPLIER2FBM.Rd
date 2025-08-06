@@ -12,7 +12,7 @@ preprocessPLIER2FBM(
 )
 }
 \arguments{
-\item{fbm}{A bigstatsr::FBM (genes × samples), possibly read-only.}
+\item{fbm}{A bigstatsr::FBM (genes x samples), possibly read-only.}
 
 \item{mean_cutoff}{Numeric or NULL. Minimum row mean to keep (NULL = no mean filter).}
 
@@ -30,4 +30,21 @@ A list with:
 \description{
 Makes a writable copy of the input FBM, cleans it (log2 transform if needed, fill NAs),
 filters rows by mean/variance, and returns the filtered FBM plus stats and indices.
+}
+\examples{
+library(bigstatsr)
+# create a toy matrix and back it with an FBM
+mat <- matrix(c(
+  1,   2,   3,    # geneA
+  10, 20,  30,    # geneB
+  100,200,300     # geneC
+), nrow = 3, byrow = TRUE,
+dimnames = list(c("geneA","geneB","geneC"), paste0("s", 1:3)))
+fbm <- FBM(nrow(mat), ncol(mat), init = mat)
+
+# preprocess without filtering (all genes kept)
+res_all <- preprocessPLIER2FBM(fbm)
+str(res_all)
+# preprocess with a mean filter to drop low‐expression genes
+res_filtered <- preprocessPLIER2FBM(fbm, mean_cutoff = 50)
 }

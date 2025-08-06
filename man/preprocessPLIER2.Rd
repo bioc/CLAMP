@@ -16,12 +16,26 @@ preprocessPLIER2(Y, mean_cutoff = 0, var_cutoff = 0)
 \value{
 A list with components:
 \itemize{
-\item \strong{fbm_filtered}: filtered matrix (genes × samples)
-\item \strong{rowStats}: data.frame with columns \code{mean} and \code{variance} for each kept gene
-\item \strong{kept_rows}: integer vector of the original row indices that were kept
+\item Y_filtered: filtered matrix (genes x samples)
+\item rowStats: data.frame with columns mean and variance for each kept gene
+\item kept_rows: integer vector of the original row indices that were kept
 }
 }
 \description{
 Filters genes by mean expression and variance, returning the filtered matrix
 and per-gene statistics.
+}
+\examples{
+# construct a small example matrix
+mat <- matrix(
+  c(1, 5, 10,
+    2, 6, 11,
+    3, 7, 12,
+    4, 8, 13),
+  nrow = 4, byrow = FALSE,
+  dimnames = list(paste0("gene", 1:4), paste0("sample", 1:3))
+)
+
+# keep genes with mean >= 6 and variance >= 2
+res <- preprocessPLIER2(mat, mean_cutoff = 6, var_cutoff = 2)
 }

@@ -6,6 +6,9 @@
 \usage{
 max_correspondence_greedy(cor_mat)
 }
+\arguments{
+\item{cor_mat}{A square numeric matrix of pairwise correlations (rows = items, cols = items).}
+}
 \description{
 Finds a one-to-one assignment (permutation) between rows and columns of a square correlation matrix
 that maximizes the total correlation score, using a greedy algorithm.

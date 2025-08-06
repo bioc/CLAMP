@@ -1,5 +1,3 @@
-context("projectPLIER")
-
 test_that("projectPLIER projects new data correctly", {
   mat <- matrix(rnorm(100), 10, 10)
   svdres <- rsvd(mat, k = 5)

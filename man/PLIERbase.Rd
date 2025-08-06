@@ -24,7 +24,7 @@ PLIERbase(
 )
 }
 \arguments{
-\item{Y}{Input gene expression matrix (genes × samples). Can be dense, sparse (\code{dgCMatrix}), or FBM.}
+\item{Y}{Input gene expression matrix (genes x samples). Can be dense, sparse (\code{dgCMatrix}), or FBM.}
 
 \item{k}{Number of latent variables.}
 
@@ -59,8 +59,8 @@ PLIERbase(
 \value{
 A list with components:
 \describe{
-\item{\code{B}}{Latent variable loadings (LVs × genes)}
-\item{\code{Z}}{Latent variable scores (LVs × samples)}
+\item{\code{B}}{Latent variable loadings (LVs x genes)}
+\item{\code{Z}}{Latent variable scores (LVs x samples)}
 \item{\code{Zraw}}{Raw Z matrix before thresholding}
 \item{\code{L1}}{Final value of L1 used}
 \item{\code{L2}}{Final value of L2 used}
@@ -76,4 +76,14 @@ adaptive sparsity, positive constraints, and regularization.
 This function is the low-level implementation of PLIER. It alternates between solving for \code{Z}
 given \code{B} and solving for \code{B} given \code{Z}, with optional sparsity and non-negativity
 constraints on \code{Z}. Convergence is assessed via relative change in \code{B}.
+}
+\examples{
+# small toy dataset: 5 genes x 4 samples
+Y <- matrix(rnorm(5 * 4), nrow = 5, ncol = 4)
+# run a single iteration for speed
+res <- PLIERbase(Y, k = 2, max.iter = 1, trace = FALSE)
+# inspect dimensions of B and Z
+dim(res$B)
+dim(res$Z)
+
 }

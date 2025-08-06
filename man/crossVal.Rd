@@ -9,15 +9,15 @@ crossVal(plierRes, priorMat, priorMatcv)
 \arguments{
 \item{plierRes}{A list containing \code{U} (loadings) and \code{Z} (scores) from a PLIER model.}
 
-\item{priorMat}{A binary matrix (genes × pathways) indicating original pathway annotations.}
+\item{priorMat}{A binary matrix (genes x pathways) indicating original pathway annotations.}
 
 \item{priorMatcv}{A version of \code{priorMat} used to mask held-out annotations for cross-validation.}
 }
 \value{
 A list with:
 \describe{
-\item{\code{Uauc}}{Matrix of AUC values (pathways × LVs)}
-\item{\code{Upval}}{Matrix of \code{-log10(p)} values (pathways × LVs)}
+\item{\code{Uauc}}{Matrix of AUC values (pathways x LVs)}
+\item{\code{Upval}}{Matrix of \code{-log10(p)} values (pathways x LVs)}
 \item{\code{summary}}{Data frame with pathway, LV index, AUC, p-value, and FDR}
 }
 }

@@ -1,14 +1,35 @@
 Package: PLIER2
-Title: What the Package Does (One Line, Title Case)
+Type: Package
+Title: Pathway-Level Information ExtractoR Version 2 for Gene Expression Analysis
 Version: 0.0.0.9000
-Authors@R: person("First", "Last", email = "first.last@example.com", role = c("aut","cre"))
-Description: What the package does (one paragraph).
-License: MIT + file LICENSE
+Authors@R: c(person("Marc", "Subirana-Granes", email = "mb2subi@gmail.com", role = c("aut","cre")), person("Maria", "Chikina", email = "mchikina@gmail.com", role = "aut"))
+Description: PLIER2 integrates pathway priors into matrix factorization for gene expression, with support for big matrices, adaptive sparsity, cross-validation, and projection.
+License: GPL-3
 Encoding: UTF-8
 LazyData: true
 Depends: R (>= 3.5)
-Imports: bigstatsr, dplyr, glmnet, irlba, Matrix, rlang, rsvd
-Suggests: knitr, pkgdown
+Imports:
+    bigstatsr,
+    dplyr,
+    ggplot2,
+    ggrepel,
+    glmnet,
+    irlba,
+    Matrix,
+    rlang,
+    rsvd
+Suggests:
+    AnnotationDbi,
+    DT,
+    DiagrammeR,
+    data.table,
+    hdf5r,
+    here,
+    org.Hs.eg.db,
+    knitr,
+    rmarkdown,
+    testthat,
+    rappdirs
 VignetteBuilder: knitr
 URL: https://mchikina.github.io/PLIER2/, https://github.com/mchikina/PLIER2
 BugReports: https://github.com/mchikina/PLIER2/issues

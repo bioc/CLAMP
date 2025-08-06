@@ -7,7 +7,7 @@
 cpmPLIER2FBM(fbm_counts, block_size = 1000)
 }
 \arguments{
-\item{fbm_counts}{A bigstatsr::FBM of raw counts (genes × samples).}
+\item{fbm_counts}{A bigstatsr::FBM of raw counts (genes x samples).}
 
 \item{block_size}{Numeric; rows per block (default 1000).}
 }
@@ -18,7 +18,19 @@ Invisibly returns the modified FBM (now holding CPM values).
 Compute CPM on a file-backed matrix for PLIER2 (in-place)
 }
 \examples{
-# fbm <- FBM(1000, 10, backingfile="raw", backingpath=".")
-# … fill fbm with counts …
-cpmPLIER2FBM(fbm)
+library(bigstatsr)
+
+# small 2 genes x 3 samples count matrix
+mat <- matrix(
+  c(10, 20, 30,
+    40, 50, 60),
+  nrow = 2, byrow = FALSE,
+  dimnames = list(c("gene1", "gene2"), paste0("sample", 1:3))
+)
+
+# create an FBM initialized with counts
+fbm <- FBM(nrow(mat), ncol(mat), init = mat)
+
+# convert counts to CPM in-place
+cpmPLIER2FBM(fbm, block_size = 1)
 }

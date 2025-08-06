@@ -1,5 +1,3 @@
-context("PLIERbase")
-
 test_that("PLIERbase returns list with B and Z of correct dimensions", {
   mat <- matrix(rnorm(100), 10, 10)
   svdres <- rsvd(mat, k = 5)

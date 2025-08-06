@@ -7,7 +7,7 @@
 cpmPLIER2(counts)
 }
 \arguments{
-\item{counts}{A numeric matrix or data.frame of raw counts (genes × samples).}
+\item{counts}{A numeric matrix or data.frame of raw counts (genes x samples).}
 }
 \value{
 A numeric matrix of CPM values (same dimensions), ready for PLIER2 input.

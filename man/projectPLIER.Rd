@@ -9,13 +9,13 @@ projectPLIER(PLIERres, newdata, scale = 1)
 \arguments{
 \item{PLIERres}{A result object from \code{PLIERfull()} or \code{PLIERbase()}, containing at least \code{Z} and \code{L2}.}
 
-\item{newdata}{A gene expression matrix (genes × samples) to be projected. Must have the same genes (rows) as \code{PLIERres$Z}.
+\item{newdata}{A gene expression matrix (genes x samples) to be projected. Must have the same genes (rows) as \code{PLIERres$Z}.
 Can be a standard matrix, sparse matrix, or FBM/big.matrix.}
 
 \item{scale}{Optional numeric multiplier for the L2 regularization terms. Default is 1.}
 }
 \value{
-A matrix \code{B} of projected latent loadings (LVs × samples) for the new dataset.
+A matrix \code{B} of projected latent loadings (LVs x samples) for the new dataset.
 }
 \description{
 Computes the latent loadings \code{B} for new gene expression data using the latent variables
@@ -26,4 +26,15 @@ new datasets with matched genes.
 This function uses ridge-regularized least squares to compute \code{B = solve(ZᵗZ + L2·I) · ZᵗY}, where
 \code{Z} is the latent matrix from the trained PLIER model and \code{Y} is the new dataset.
 If \code{newdata} is a Filebacked Big Matrix (FBM), the computation is optimized using \code{bigstatsr::big_cprodMat()}.
+}
+\examples{
+# fit a tiny PLIER model for projection
+Y0 <- matrix(rnorm(5*3), nrow = 5)
+base <- PLIERbase(Y0, k = 2, max.iter = 1, trace = FALSE)
+# new data with same 5 genes
+newY <- matrix(rnorm(5*2), nrow = 5)
+projB <- projectPLIER(base, newdata = newY)
+# check dimensions: 2 latent vars x 2 samples
+dim(projB)
+
 }

@@ -1,6 +1,3 @@
-library(testthat)
-library(Matrix)
-
 test_that("getMatchedPathwayMat returns zero‐column matrix if no overlap", {
   simple <- sparseMatrix(
     i = c(1,2), j = c(1,1), x = 1,

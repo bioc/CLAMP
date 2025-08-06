@@ -28,7 +28,7 @@ solveU(
 
 \item{Chat}{(Optional) Precomputed pseudo-inverse of \code{priorMat}; if \code{NULL}, it is calculated using ridge regularization.}
 
-\item{priorMat}{A numeric matrix with prior information (features × pathways).}
+\item{priorMat}{A numeric matrix with prior information (features x pathways).}
 
 \item{penalty.factor}{Optional penalty weights for features in \code{priorMat}.}
 
@@ -59,7 +59,7 @@ solveU(
 \value{
 A list with one element:
 \describe{
-\item{\code{U}}{A matrix of loadings (features × components). Columns are named \code{LV1}, \code{LV2}, ...}
+\item{\code{U}}{A matrix of loadings (features x components). Columns are named \code{LV1}, \code{LV2}, ...}
 }
 }
 \description{

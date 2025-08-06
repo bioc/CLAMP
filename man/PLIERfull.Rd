@@ -32,13 +32,14 @@ PLIERfull(
   adaptive.p = 0.05,
   useNNLS = T,
   useRaw = T,
-  refitAll = F
+  refitAll = F,
+  useSE = F
 )
 }
 \arguments{
-\item{Y}{Gene expression matrix (genes × samples). Can be dense, sparse (dgCMatrix), or FBM.}
+\item{Y}{Gene expression matrix (genes x samples). Can be dense, sparse (dgCMatrix), or FBM.}
 
-\item{priorMat}{Binary matrix (genes × pathways) representing prior annotations.}
+\item{priorMat}{Binary matrix (genes x pathways) representing prior annotations.}
 
 \item{svdres}{Optional SVD result used for initialization.}
 
@@ -93,19 +94,21 @@ small positive values, assuming they reflect noise. Default is 0.05.}
 \item{useRaw}{If \code{TRUE}, uses unthresholded Z for solving U. Default is \code{TRUE}.}
 
 \item{refitAll}{If \code{TRUE}, refits all U columns every update. Default is \code{FALSE}.}
+
+\item{useSE}{Logical; passed to the internal \code{solveU()} call. If \code{TRUE}, enables standard-error–aware selection when fitting U (pathway coefficients). Default is \code{FALSE}.}
 }
 \value{
 A list with the following components:
 \describe{
-\item{\code{B}}{Latent variable loadings (LVs × genes)}
-\item{\code{Z}}{Latent variable matrix (LVs × samples)}
-\item{\code{U}}{Pathway loadings matrix (pathways × LVs)}
+\item{\code{B}}{Latent variable loadings (LVs x genes)}
+\item{\code{Z}}{Latent variable matrix (LVs x samples)}
+\item{\code{U}}{Pathway loadings matrix (pathways x LVs)}
 \item{\code{C}}{Masked prior matrix used for training}
 \item{\code{L1}, \code{L2}}{Regularization parameters}
 \item{\code{heldOutGenes}}{List of held-out genes per pathway (if CV is enabled)}
 \item{\code{Uauc}}{AUC matrix from CV evaluation (if enabled)}
 \item{\code{Up}}{-\code{log10(p)} values from CV evaluation (if enabled)}
-\item{\code{summary}}{Data frame of AUC, p-values, and FDR per pathway × LV (if enabled)}
+\item{\code{summary}}{Data frame of AUC, p-values, and FDR per pathway x LV (if enabled)}
 \item{\code{priorMatCV}}{Masked prior matrix used during CV}
 \item{\code{priorMat}}{Final filtered prior matrix}
 \item{\code{withPrior}}{Indices of LVs with non-zero pathway loadings}
@@ -121,4 +124,13 @@ guided by prior knowledge and includes optional cross-validation to evaluate pat
 The model alternates between solving \code{Z}, \code{B}, and \code{U}. Adaptive sparsity is applied
 to \code{Z} using a dynamic threshold based on the negative tail of its distribution. Cross-validation
 is used to hold out gene annotations in \code{priorMat} and evaluate latent variable specificity.
+}
+\examples{
+mat <- matrix(rnorm(100), 10, 10)
+svdres <- rsvd::rsvd(mat, k = 5)
+base <- PLIERbase(Y = mat, k = 5, svdres = svdres, trace = FALSE)
+priorMat <- matrix(1, nrow(mat), 5)
+full <- PLIERfull(Y = mat, priorMat = priorMat, svdres = svdres,
+                  plier.base.result = base, k = 5,
+                  doCrossval = FALSE, trace = FALSE, max.U.updates = 0)
 }

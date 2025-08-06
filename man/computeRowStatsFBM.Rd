@@ -14,8 +14,8 @@ computeRowStatsFBM(fbm, chunk_size = 1000)
 \value{
 A list with two numeric vectors:
 \describe{
-\item{\code{row_sums}}{Sum of each row.}
-\item{\code{row_sums_sq}}{Sum of squares of each row.}
+\item{row_sums}{Sum of each row.}
+\item{row_sums_sq}{Sum of squares of each row.}
 }
 }
 \description{

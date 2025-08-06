@@ -1,5 +1,3 @@
-context("preprocessPLIER2FBM")
-
 test_that("preprocessPLIER2FBM filters FBM and returns correct structure", {
   mat <- matrix(rnorm(100), 10, 10)
   fbm <- FBM(nrow(mat), ncol(mat))

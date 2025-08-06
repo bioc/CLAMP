@@ -7,11 +7,6 @@ library(dplyr)
 #'
 #' @param x A numeric matrix.
 #' @return A matrix of the same shape, with each row scaled independently.
-#' @examples
-#' # simple 3×3 matrix
-#' mat <- matrix(1:9, nrow = 3, byrow = TRUE)
-#' # each row will be centered and scaled
-#' tscale(mat)
 tscale <- function(x) {
   row_means <- rowMeans(x)
   row_sds <- sqrt(rowMeans((x - row_means)^2))
@@ -20,103 +15,115 @@ tscale <- function(x) {
 }
 
 
-#' Compare latent variable loadings against a target using correlation or other statistics
-#'
-#' This function compares two sets of latent variable loadings (`res1`, `res2`) with respect to a binary or continuous
-#' target matrix. It computes the maximal association (e.g., correlation, t-statistic, or AUC) between each latent variable
-#' and each column in the target, and returns a paired comparison plot and summary.
-#' @examples
-#' # simulate two sets of 4 latent variables over 5 features
-#' set.seed(42)
-#' B1 <- matrix(rnorm(5 * 4), nrow = 5, ncol = 4)
-#' B2 <- matrix(rnorm(5 * 4), nrow = 5, ncol = 4)
-#' # a binary target matrix (5 features × 3 outcomes)
-#' target <- matrix(sample(0:1, 5 * 3, TRUE), nrow = 5, ncol = 3)
-#' # compare using Pearson correlation
-#' cmp <- compareBs(list(B = B1), list(B = B2), target, method = "p")
-#' # view the scatter plot
-#' print(cmp$plot)
-#' # inspect the summary data frame
-#' head(cmp$df)
-#'
-#' @importFrom ggplot2 geom_point geom_abline labs theme_minimal
-#' @importFrom ggrepel geom_text_repel
-compareBs<-function(res1, res2, target, method = "p", xlab="1", ylab="2", stat.method="t") {
-  extract_B <- function(res) {
-    if (class(res)[1] == "list") {
-      return(as.matrix(res$B))
-    } else if (class(res)[1] == "rsvd") {
-      return(t(res$v))
-    } else {
-      return(as.matrix(res))
-    }
-  }
+# #' Compare latent variable loadings against a target using correlation or other statistics
+# #'
+# #' This function compares two sets of latent variable loadings (`res1`, `res2`) with respect to a binary or continuous
+# #' target matrix. It computes the maximal association (e.g., correlation, t-statistic, or AUC) between each latent variable
+# #' and each column in the target, and returns a paired comparison plot and summary.
+# #' @param res1 First set of loadings. One of:
+# #'   \itemize{
+# #'     \item \code{list} with component \code{B} (features × LVs)
+# #'     \item \code{rsvd} object (uses \code{t(v)})
+# #'     \item numeric matrix (features × LVs)
+# #'   }
+# #'   Rows (features) must align with \code{target}.
+# #' @param res2 Second set of loadings. Same accepted types/shape as \code{res1}.
+# #' @param target Numeric matrix of outcomes with dimensions \code{n_features × n_outcomes}.
+# #'   Rows correspond to features of \code{res1}/\code{res2}. Rows containing any \code{NA}
+# #'   are dropped internally.
+# #' @param method Character string selecting the association metric. One of:
+# #'   \code{"p"} (Pearson), \code{"s"} (Spearman), \code{"a"} (AUC), or \code{"t"} (two-sample
+# #'   t-statistic screen). Default is \code{"p"}.
+# #' @param xlab Character label appended to the x-axis title to identify \code{res1}.
+# #'   Default \code{"1"}.
+# #' @param ylab Character label appended to the y-axis title to identify \code{res2}.
+# #'   Default \code{"2"}.
+# #' @param stat.method Character string for the paired test comparing \code{Cor2} vs \code{Cor1}
+# #'   across targets: \code{"t"} for paired t-test or \code{"wilcox"} for Wilcoxon signed-rank.
+# #'   Default \code{"t"}.
+# #'
+# #' @return A list with:
+# #'   \item{plot}{A ggplot object showing \code{Cor1} (x) vs \code{Cor2} (y) with the identity line.}
+# #'   \item{df}{A data frame with columns \code{Cor1}, \code{Cor2}, \code{BestIdxRes1},
+# #'     \code{BestIdxRes2}, \code{Label}, and \code{corMean}.}
+# #'
+# #' @seealso \code{\link{allAgainstAllAUCs}}, \code{\link{allAgainstAllTstats}}
+# #' @importFrom ggplot2 ggplot aes geom_point geom_abline labs theme_minimal annotate
+# #' @importFrom ggrepel geom_text_repel
+# #' @importFrom stats cor t.test wilcox.test
+# compareBs<-function(res1, res2, target, method = "p", xlab="1", ylab="2", stat.method="t") {
+#   extract_B <- function(res) {
+#     if (class(res)[1] == "list") {
+#       return(as.matrix(res$B))
+#     } else if (class(res)[1] == "rsvd") {
+#       return(t(res$v))
+#     } else {
+#       return(as.matrix(res))
+#     }
+#   }
 
-  B1 <- extract_B(res1)
-  B2 <- extract_B(res2)
-  noNA=!apply(target,1, function(x){any(is.na(x))})
-  B1=B1[,noNA]
-  B2=B2[,noNA]
-  target=target[noNA,]
+#   B1 <- extract_B(res1)
+#   B2 <- extract_B(res2)
+#   noNA=!apply(target,1, function(x){any(is.na(x))})
+#   B1=B1[,noNA]
+#   B2=B2[,noNA]
+#   target=target[noNA,]
 
-  if (method %in% c("s", "p")) {
-    mat1 <- cor(t(B1), target, method = method)
-    mat2 <- cor(t(B2), target, method = method)
-    cor1 <- apply(mat1, 2, max, na.rm=T)
-    cor2 <- apply(mat2, 2, max, na.rm=T)
-    idx1 <- apply(mat1, 2, which.max)
-    idx2 <- apply(mat2, 2, which.max)
-  } else if (method == "a") {
-    mat1 <- allAgainstAllAUCs(t(B1), target)
-    mat2 <- allAgainstAllAUCs(t(B2), target)
-    cor1 <- apply(mat1, 2, max)
-    cor2 <- apply(mat2, 2, max)
-    idx1 <- apply(mat1, 2, which.max)
-    idx2 <- apply(mat2, 2, which.max)
-  } else if (method == "t") {
-    mat1 <- allAgainstAllTstats(t(B1), target)
-    mat2 <- allAgainstAllTstats(t(B2), target)
-    cor1 <- apply(mat1, 1, max)
-    cor2 <- apply(mat2, 1, max)
-    idx1 <- apply(mat1, 1, which.max)
-    idx2 <- apply(mat2, 1, which.max)
-  }
-  Labels <- colnames(target)
+#   if (method %in% c("s", "p")) {
+#     mat1 <- cor(t(B1), target, method = method)
+#     mat2 <- cor(t(B2), target, method = method)
+#     cor1 <- apply(mat1, 2, max, na.rm=T)
+#     cor2 <- apply(mat2, 2, max, na.rm=T)
+#     idx1 <- apply(mat1, 2, which.max)
+#     idx2 <- apply(mat2, 2, which.max)
+#   } else if (method == "a") {
+#     mat1 <- allAgainstAllAUCs(t(B1), target)
+#     mat2 <- allAgainstAllAUCs(t(B2), target)
+#     cor1 <- apply(mat1, 2, max)
+#     cor2 <- apply(mat2, 2, max)
+#     idx1 <- apply(mat1, 2, which.max)
+#     idx2 <- apply(mat2, 2, which.max)
+#   } else if (method == "t") {
+#     mat1 <- allAgainstAllTstats(t(B1), target)
+#     mat2 <- allAgainstAllTstats(t(B2), target)
+#     cor1 <- apply(mat1, 1, max)
+#     cor2 <- apply(mat2, 1, max)
+#     idx1 <- apply(mat1, 1, which.max)
+#     idx2 <- apply(mat2, 1, which.max)
+#   }
+#   Labels <- colnames(target)
 
-  df <- data.frame(Cor1 = cor1, Cor2 = cor2, BestIdxRes1=idx1, BestIdxRes2=idx2,  Label = Labels)
-  df$corMean=(df$Cor1+df$Cor2)/2
-  if(stat.method=="t"){
-    pval <- t.test(df$Cor2, df$Cor1, paired = TRUE, alternative = "greater")$p.value
-  }else{
-    pval <- wilcox.test(df$Cor2, df$Cor1, paired = TRUE, alternative = "greater")$p.value
-  }
-  method_label <- switch(method,
-                         p = "Pearson correlation",
-                         s = "Spearman correlation",
-                         a = "AUC",
-                         t = "T-statistic"
-  )
-  pl<-ggplot(df, aes(x = Cor1, y = Cor2, label = Label)) +
-    geom_point() +
-    geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red", linewidth = 1) +
-    geom_text_repel() +
-    labs(x = paste("Max", method_label, xlab),
-         y = paste("Max", method_label, ylab))+
-    annotate("text", x = -Inf, y = Inf, hjust = -0.1, vjust = 1.1, label = paste("p =", signif(pval, 3)))+
-    #    annotate("text", x = Inf, y = -Inf, label = paste("p =", signif(pval, 3)),
-    #            hjust = 1.1, vjust = -0.5, size = 4)+
-    theme_minimal()
-  return(list(plot=pl, df=df))
+#   df <- data.frame(Cor1 = cor1, Cor2 = cor2, BestIdxRes1=idx1, BestIdxRes2=idx2,  Label = Labels)
+#   df$corMean=(df$Cor1+df$Cor2)/2
+#   if(stat.method=="t"){
+#     pval <- t.test(df$Cor2, df$Cor1, paired = TRUE, alternative = "greater")$p.value
+#   }else{
+#     pval <- wilcox.test(df$Cor2, df$Cor1, paired = TRUE, alternative = "greater")$p.value
+#   }
+#   method_label <- switch(method,
+#                          p = "Pearson correlation",
+#                          s = "Spearman correlation",
+#                          a = "AUC",
+#                          t = "T-statistic"
+#   )
+#   pl<-ggplot(df, aes(x = Cor1, y = Cor2, label = Label)) +
+#     geom_point() +
+#     geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red", linewidth = 1) +
+#     geom_text_repel() +
+#     labs(x = paste("Max", method_label, xlab),
+#          y = paste("Max", method_label, ylab))+
+#     annotate("text", x = -Inf, y = Inf, hjust = -0.1, vjust = 1.1, label = paste("p =", signif(pval, 3)))+
+#     #    annotate("text", x = Inf, y = -Inf, label = paste("p =", signif(pval, 3)),
+#     #            hjust = 1.1, vjust = -0.5, size = 4)+
+#     theme_minimal()
+#   return(list(plot=pl, df=df))
 
-}
+# }
 
 #' Print a concatenated message
 #'
-#' Wrapper around \code{message()} that pastes arguments together into a single string.
+#' Wrapper around `message()` that pastes arguments together into a single string.
 #' @param ... Character strings to concatenate and print.
-#' @examples
-#' # prints "alpha beta gamma"
-#' mymessage("alpha", "beta", "gamma")
 mymessage <- function(...) {
   message(paste(...))
 }
@@ -129,20 +136,10 @@ mymessage <- function(...) {
 #' Summarizes a cross-validation results data frame to extract the highest AUC value
 #' associated with each latent variable (LV).
 #'
-#' @param summary A data frame (e.g., from \code{crossVal()}) .
-#' @param verbose Logical; if \code{TRUE}, prints counts of LVs exceeding AUC thresholds. Default is \code{FALSE}.
+#' @param summary A data frame (e.g., from `crossVal()`) .
+#' @param verbose Logical; if `TRUE`, prints counts of LVs exceeding AUC thresholds. Default is `FALSE`.
 #'
-#' @return A data frame with columns \code{LV index} and \code{max_AUC}.
-#'
-#' # create a mock summary table for two LVs
-#' summary_df <- data.frame(
-#'   `LV index` = c(1, 1, 2, 2),
-#'   AUC        = c(0.65, 0.75, 0.85, 0.55)
-#' )
-#' # get the maximum AUC per LV
-#' getMaxAUC(summary_df)
-#'
-#' @export
+#' @return A data frame with columns LV index and max_AUC.
 getMaxAUC=function(summary, verbose=F){
 
   max_auc_per_lv <- summary %>%
@@ -163,19 +160,9 @@ getMaxAUC=function(summary, verbose=F){
 #' Given a summary data frame from cross-validation, reports the number of latent variables
 #' with maximum AUC exceeding 0.7, 0.8, and 0.9.
 #'
-#' @param summary A data frame with \code{LV index} and \code{AUC} columns.
+#' @param summary A data frame with `LV index` and `AUC` columns.
 #'
 #' @return A named numeric vector with counts for thresholds 0.7, 0.8, and 0.9.
-#'
-#' # example summary table for 3 LVs
-#' summary_df <- data.frame(
-#'   `LV index` = c(1, 1, 2, 2, 3, 3),
-#'   AUC         = c(0.65, 0.75, 0.82, 0.78, 0.91, 0.89)
-#' )
-#' # count how many LVs exceed each threshold
-#' getAUCstats(summary_df)
-#'
-#' @export
 getAUCstats=function(summary){
   out=getMaxAUC(summary)
   unlist(lapply(c(0.7,0.8, 0.9), function(x){sum(out$max_AUC>x)}))
@@ -188,22 +175,6 @@ getAUCstats=function(summary){
 #' that maximizes the total correlation score, using a greedy algorithm.
 #'
 #' @param cor_mat A square numeric matrix of pairwise correlations (rows = items, cols = items).
-#' @return A list with components:
-#'   \describe{
-#'     \item{\code{permutation}}{Integer vector of length \code{nrow(cor_mat)}, where entry \code{i} 
-#'       gives the column assigned to row \code{i}.}
-#'     \item{\code{sum}}{Total sum of the selected correlations.}
-#'   }
-#' cor_mat <- matrix(c(
-#'   1.0, 0.2, 0.4,
-#'   0.3, 1.0, 0.1,
-#'   0.5, 0.2, 1.0
-#' ), nrow = 3, byrow = TRUE)
-#' res <- max_correspondence_greedy(cor_mat)
-#' res$permutation
-#' res$sum
-#'
-#' @export
 max_correspondence_greedy <- function(cor_mat) {
   n <- nrow(cor_mat)
   used_rows <- rep(FALSE, n)
@@ -235,21 +206,17 @@ max_correspondence_greedy <- function(cor_mat) {
 #' @param url A character string specifying the URL to a GMT file.
 #' @param name Optional name for the GMT file (defaults to the portion after the last "=" in the URL).
 #' @param cache_dir Optional directory in which to cache/download the GMT file.
-#' @param redownload Logical; if \code{TRUE}, forces re-download even if cached.
+#' @param redownload Logical; if `TRUE`, forces re-download even if cached.
 #'
 #' @return A named list where each element is a character vector of gene names for a given gene set.
 #'
 #' @examples
-#' \dontrun{
-#' # Example: download the KEGG 2019 Human GMT from Enrichr
 #' url <- "https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=KEGG_2019_Human"
 #' gmt_list <- getGMT(url)
 #' # list available gene sets
 #' names(gmt_list)
 #' # inspect the first few genes in the first gene set
 #' head(gmt_list[[1]])
-#' }
-#'
 #' @export
 getGMT <- function(url, name = NULL, cache_dir = NULL, redownload = FALSE) {
 if (is.null(name)) {
@@ -278,14 +245,6 @@ read_gmt(cache_file)
 #' @param filename A character string giving the path to a .gmt file.
 #'
 #' @return A named list where each element is a character vector of gene names.
-#' @examples
-#' # create a temporary GMT file
-#' tmp <- tempfile(fileext = ".gmt")
-#' writeLines(c(
-#'   "Set1\tDescription\tGeneA\tGeneB\tGeneA",
-#'   "Set2\tDescription\tGeneC\tGeneD"
-#' ), tmp)
-#' gmt_list <- read_gmt(tmp)
 read_gmt=function (filename) {
   gmt = list()
   lines = readLines(filename)
@@ -300,7 +259,7 @@ read_gmt=function (filename) {
 
 #' Convert a list of GMT gene sets to a sparse matrix
 #'
-#' Converts a list of named gene sets (e.g., from \code{getGMT()}) into a sparse binary matrix
+#' Converts a list of named gene sets (e.g., from `getGMT()`) into a sparse binary matrix
 #' where rows are genes, columns are gene sets, and entries are 1 if the gene is in the set.
 #'
 #' @param gmtList A nested list of gene sets. Outer names are gene set names; each entry is a character vector of gene names.
@@ -362,16 +321,6 @@ gmtListToSparseMat=function(gmtList){
 #' @param data2 A matrix, data frame, or similar object with row names.
 #'
 #' @return A character vector of row names common to both inputs.
-#'
-#' @examples
-#' # create two matrices with overlapping row names
-#' m1 <- matrix(1:4, nrow = 2)
-#' rownames(m1) <- c("geneA", "geneB")
-#' m2 <- matrix(5:8, nrow = 2)
-#' rownames(m2) <- c("geneB", "geneC")
-#' # should return only the common row name "geneB"
-#' commonRows(m1, m2)
-#'
 commonRows=function(data1, data2){
   intersect(rownames(data1), rownames(data2))
 }
@@ -379,30 +328,20 @@ commonRows=function(data1, data2){
 #' Clean a Filebacked Big Matrix (FBM) by log-transforming and handling NAs
 #'
 #' This function inspects an FBM to determine if log-transformation is needed (based on value range)
-#' and whether NA values are present. If the maximum value is ≥ 100, it applies a log2(x + 1)
+#' and whether NA values are present. If the maximum value is >= 100, it applies a log2(x + 1)
 #' transformation in-place. If any NA values are detected, they are replaced with 0.
 #'
-#' @param fbm A \code{bigmemory::FBM} or \code{bigstatsr::FBM} object.
+#' @param fbm A `bigmemory::FBM` or `bigstatsr::FBM` object.
 #'
 #' @return A list with:
-#' \describe{
-#'   \item{\code{max_value}}{The maximum value encountered in the FBM (after log transformation if applied).}
-#'   \item{\code{had_na}}{Logical indicating whether any NA values were found and filled.}
-#' }
+#'   \describe{
+#'     \item{max_value}{The maximum value encountered in the FBM (after log transformation if applied).}
+#'     \item{had_na}{Logical indicating whether any NA values were found and filled.}
+#'   }
 #'
 #' @details
-#' Modifies the FBM in place. Uses \code{bigstatsr::big_apply()} to process in parallel-safe chunks.
-#'
-#' \dontrun{
-#' library(bigstatsr)
-#' # create a small FBM with some large values and NAs
-#' fbm <- FBM(nrow = 5, ncol = 4, init = 1:20)
-#' fbm[1, 1] <- 200  # trigger log2 transformation
-#' fbm[2, 2] <- NA   # introduce an NA
-#' res <- cleanFBM(fbm)
-#'
+#' Modifies the FBM in place. Uses `bigstatsr::big_apply()` to process in parallel-safe chunks.
 #' @importFrom bigstatsr big_apply rows_along FBM
-#' @export
 cleanFBM=function(fbm){
   # SCheck for NA and max value
   max_value <- -Inf
@@ -444,16 +383,16 @@ cleanFBM=function(fbm){
 
 #' Compute row-wise sum and sum of squares for a Filebacked Big Matrix
 #'
-#' Efficiently computes row sums and row sum-of-squares for a \code{bigstatsr::FBM} using
+#' Efficiently computes row sums and row sum-of-squares for a `bigstatsr::FBM` using
 #' column-wise chunking, suitable for large datasets that cannot be loaded fully into memory.
 #'
-#' @param fbm A \code{bigstatsr::FBM} object.
+#' @param fbm A `bigstatsr::FBM` object.
 #' @param chunk_size Number of columns to process at a time. Default is 1000.
 #'
 #' @return A list with two numeric vectors:
 #' \describe{
-#'   \item{\code{row_sums}}{Sum of each row.}
-#'   \item{\code{row_sums_sq}}{Sum of squares of each row.}
+#'   \item{row_sums}{Sum of each row.}
+#'   \item{row_sums_sq}{Sum of squares of each row.}
 #' }
 #'
 computeRowStatsFBM <- function(fbm, chunk_size = 1000) {
@@ -488,16 +427,16 @@ computeRowStatsFBM <- function(fbm, chunk_size = 1000) {
 #' Filters an FBM based on row-level mean and variance thresholds, returning a new FBM
 #' with only the selected rows.
 #'
-#' @param fbm A \code{bigstatsr::FBM} object.
-#' @param rowStats A list with numeric vectors \code{row_means} and \code{row_variances}.
+#' @param fbm A `bigstatsr::FBM` object.
+#' @param rowStats A list with numeric vectors `row_means` and `row_variances`.
 #' @param mean_cutoff Optional minimum mean threshold; rows with means below this are removed.
 #' @param var_cutoff Optional minimum variance threshold; rows with variances below this are removed.
-#' @param backingfile A character string specifying the filename (without extension) for the new FBM. Default is \code{"filtered_fbm"}.
+#' @param backingfile A character string specifying the filename (without extension) for the new FBM. Default is `filtered_fbm`.
 #'
 #' @return A list with:
 #' \describe{
-#'   \item{\code{fbm_filtered}}{A new FBM object containing only filtered rows.}
-#'   \item{\code{kept_rows}}{Indices of rows retained in the filtering step.}
+#'   \item{fbm_filtered}{A new FBM object containing only filtered rows.}
+#'   \item{kept_rows}{Indices of rows retained in the filtering step.}
 #' }
 #' @details
 #' This function creates a new FBM and copies over only the rows that pass the filtering criteria.
@@ -535,14 +474,13 @@ filterFBM<- function(fbm, rowStats, mean_cutoff = NULL, var_cutoff = NULL, backi
 #'
 #' Centers each gene to mean 0 and scales to unit variance.
 #'
-#' @param Y_filtered Numeric matrix (genes × samples) returned by preprocessPLIER2
+#' @param Y_filtered Numeric matrix (genes x samples) returned by preprocessPLIER2
 #' @param rowStats   Data frame with numeric columns `mean` and `variance`,
 #'                   row-named to match `rownames(Y_filtered)`
 #'
-#' @return Numeric matrix of the same dimensions as `Y_filtered`, with each
-#'         row centered and scaled.
+#' @return Numeric matrix of the same dimensions as Y_filtered, with each row centered and scaled.
 #' @examples
-#' # simple 2 genes × 3 samples matrix
+#' # simple 2 genes x 3 samples matrix
 #' Y <- matrix(c(
 #'   2, 4, 6,    # gene1 counts
 #'   8,10,12     # gene2 counts
@@ -562,7 +500,7 @@ filterFBM<- function(fbm, rowStats, mean_cutoff = NULL, var_cutoff = NULL, backi
 zscorePLIER2 <- function(Y_filtered, rowStats) {
   # Input validation
   if (!is.matrix(Y_filtered) || !is.numeric(Y_filtered)) {
-    stop("`Y_filtered` must be a numeric matrix (genes × samples).")
+    stop("`Y_filtered` must be a numeric matrix (genes x samples).")
   }
   if (!is.data.frame(rowStats) ||
       !all(c("mean", "variance") %in% colnames(rowStats))) {
@@ -597,7 +535,7 @@ zscorePLIER2 <- function(Y_filtered, rowStats) {
 #' Makes a writable copy of the input FBM, cleans it (log2 transform if needed, fill NAs),
 #' filters rows by mean/variance, and returns the filtered FBM plus stats and indices.
 #'
-#' @param fbm A bigstatsr::FBM (genes × samples), possibly read-only.
+#' @param fbm A bigstatsr::FBM (genes x samples), possibly read-only.
 #' @param mean_cutoff Numeric or NULL. Minimum row mean to keep (NULL = no mean filter).
 #' @param var_cutoff  Numeric or NULL. Minimum row variance to keep (NULL = no var filter).
 #' @param backingfile Character or NULL. Base name for the *copy* FBM and filtered FBM on disk.
@@ -620,7 +558,9 @@ zscorePLIER2 <- function(Y_filtered, rowStats) {
 #' # preprocess without filtering (all genes kept)
 #' res_all <- preprocessPLIER2FBM(fbm)
 #' str(res_all)
-#'
+#’ unlink(paste0(res_all$fbm_filtered$bk), recursive = FALSE)
+#’ unlink(sub("\\.bk$", ".rds", res_all$fbm_filtered$bk))
+
 #' # preprocess with a mean filter to drop low‐expression genes
 #' res_filtered <- preprocessPLIER2FBM(fbm, mean_cutoff = 50)
 #' @export
@@ -679,6 +619,15 @@ preprocessPLIER2FBM <- function(fbm,
 #' @param fbm_filtered A bigstatsr::FBM produced by preprocessPLIER2FBM().
 #' @param rowStats A list with row_means and row_variances from that FBM.
 #' @param chunk_size Columns per block (default 1000).
+#' @examples
+#' library(bigstatsr)
+#' fbm <- FBM(nrow = 2, ncol = 4,
+#'            init = matrix(1:8, nrow = 2))
+#' stats <- list(
+#'   row_means     = rowMeans(fbm[]),
+#'   row_variances = apply(fbm[], 1, var)
+#' )
+#' zscorePLIER2FBM(fbm, stats, chunk_size = 2)
 #' @export
 zscorePLIER2FBM <- function(fbm_filtered, rowStats, chunk_size = 1000) {
   message("Applying Z-score transformation")
@@ -707,9 +656,9 @@ zscorePLIER2FBM <- function(fbm_filtered, rowStats, chunk_size = 1000) {
 #' @param var_cutoff  Numeric. Minimum row-variance required to keep a gene (default 0).
 #'
 #' @return A list with components:
-#'   - **Y_filtered**: filtered matrix (genes × samples)
-#'   - **rowStats**: data.frame with columns `mean` and `variance` for each kept gene
-#'   - **kept_rows**: integer vector of the original row indices that were kept
+#'   - Y_filtered: filtered matrix (genes x samples)
+#'   - rowStats: data.frame with columns mean and variance for each kept gene
+#'   - kept_rows: integer vector of the original row indices that were kept
 #'
 #' @examples
 #' # construct a small example matrix
@@ -722,12 +671,12 @@ zscorePLIER2FBM <- function(fbm_filtered, rowStats, chunk_size = 1000) {
 #'   dimnames = list(paste0("gene", 1:4), paste0("sample", 1:3))
 #' )
 #'
-#' # keep genes with mean ≥ 6 and variance ≥ 2
+#' # keep genes with mean >= 6 and variance >= 2
 #' res <- preprocessPLIER2(mat, mean_cutoff = 6, var_cutoff = 2)
 #' @export
 preprocessPLIER2 <- function(Y, mean_cutoff = 0, var_cutoff = 0) {
   if (!is.matrix(Y) || !is.numeric(Y)) {
-    stop("`Y` must be a numeric matrix (genes × samples).")
+    stop("`Y` must be a numeric matrix (genes x samples).")
   }
   # Compute per‐gene statistics
   row_mean <- rowMeans(Y, na.rm = TRUE)
@@ -759,7 +708,7 @@ preprocessPLIER2 <- function(Y, mean_cutoff = 0, var_cutoff = 0) {
 
 #' Compute counts-per-million (CPM) for PLIER2 pipelines
 #'
-#' @param counts A numeric matrix or data.frame of raw counts (genes × samples).
+#' @param counts A numeric matrix or data.frame of raw counts (genes x samples).
 #' @return A numeric matrix of CPM values (same dimensions), ready for PLIER2 input.
 #' @examples
 #' mat <- matrix(1:12, nrow = 3)
@@ -770,7 +719,7 @@ cpmPLIER2 <- function(counts) {
   stopifnot(is.numeric(mat), length(dim(mat)) == 2)
   lib_sizes <- colSums(mat, na.rm = TRUE)
   if (any(lib_sizes == 0)) {
-    warning("Some samples have zero total counts – CPM will be Inf/NaN.")
+    warning("Some samples have zero total counts - CPM will be Inf/NaN.")
   }
   sweep(mat, 2, lib_sizes, "/") * 1e6
 }
@@ -778,13 +727,13 @@ cpmPLIER2 <- function(counts) {
 
 #' Compute CPM on a file-backed matrix for PLIER2 (in-place)
 #'
-#' @param fbm_counts A bigstatsr::FBM of raw counts (genes × samples).
+#' @param fbm_counts A bigstatsr::FBM of raw counts (genes x samples).
 #' @param block_size Numeric; rows per block (default 1000).
 #' @return Invisibly returns the modified FBM (now holding CPM values).
 #' @examples
 #' library(bigstatsr)
 #'
-#' # small 2 genes × 3 samples count matrix
+#' # small 2 genes x 3 samples count matrix
 #' mat <- matrix(
 #'   c(10, 20, 30,
 #'     40, 50, 60),
