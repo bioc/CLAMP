@@ -613,6 +613,7 @@ preprocessPLIER2 <- function(Y, mean_cutoff = 0, var_cutoff = 0) {
   ))
 }
 
+
 #' visualize the top genes contributing to the LVs
 #'
 #' @param plierRes the result returned by PLIER
@@ -932,5 +933,59 @@ allAgainstAllAUCs=function(B, target){
   pos_mean_rank=sweep(pos_mean_rank,2,n_pos*(n_pos+1)/2, "-")
   #  / n_pos  # targets × features
   auc_matrix <- sweep(pos_mean_rank, 2, (n_pos) *n_neg, "/")  # targets × features
+}
+
+#' Compute counts-per-million (CPM) for PLIER2 pipelines
+#'
+#' @param counts A numeric matrix or data.frame of raw counts (genes × samples).
+#' @return A numeric matrix of CPM values (same dimensions), ready for PLIER2 input.
+#' @examples
+#' mat <- matrix(1:12, nrow = 3)
+#' cpmPLIER2(mat)
+#' @export
+cpmPLIER2 <- function(counts) {
+  mat <- if (is.data.frame(counts)) as.matrix(counts) else counts
+  stopifnot(is.numeric(mat), length(dim(mat)) == 2)
+  lib_sizes <- colSums(mat, na.rm = TRUE)
+  if (any(lib_sizes == 0)) {
+    warning("Some samples have zero total counts – CPM will be Inf/NaN.")
+  }
+  sweep(mat, 2, lib_sizes, "/") * 1e6
+}
+
+
+#' Compute CPM on a file-backed matrix for PLIER2 (in-place)
+#'
+#' @param fbm_counts A bigstatsr::FBM of raw counts (genes × samples).
+#' @param block_size Numeric; rows per block (default 1000).
+#' @return Invisibly returns the modified FBM (now holding CPM values).
+#' @examples
+#' # fbm <- FBM(1000, 10, backingfile="raw", backingpath=".")
+#' # … fill fbm with counts …
+#' cpmPLIER2FBM(fbm)
+#' @export
+cpmPLIER2FBM <- function(fbm_counts, block_size = 1000) {
+  if (!inherits(fbm_counts, "FBM")) {
+    stop("`fbm_counts` must be a bigstatsr::FBM object.")
+  }
+  n_r <- nrow(fbm_counts)
+  n_c <- ncol(fbm_counts)
+  lib_sizes <- numeric(n_c)
+
+  # 1) compute library sizes
+  for (rs in seq(1, n_r, by = block_size)) {
+    rows <- rs:min(rs + block_size - 1, n_r)
+    lib_sizes <- lib_sizes + colSums(fbm_counts[rows, , drop = FALSE])
+  }
+
+  # 2) in-place CPM
+  for (rs in seq(1, n_r, by = block_size)) {
+    rows <- rs:min(rs + block_size - 1, n_r)
+    block <- fbm_counts[rows, , drop = FALSE]
+    block <- sweep(block, 2, lib_sizes, "/") * 1e6
+    fbm_counts[rows, ] <- block
+  }
+
+  invisible(fbm_counts)
 
 }

@@ -148,9 +148,6 @@ Each example follows these steps:
 In this chunk, we load the whole-blood expression matrix.
 
 ```{r load-data, message=FALSE}
-# Load required libraries and data
-library(PLIER2)
-
 data("dataWholeBlood")      # expression matrix
 
 dim(dataWholeBlood)  # genes x samples
@@ -159,12 +156,15 @@ head(dataWholeBlood)  # genes x samples
 
 ## 2. Preprocess and z-score
 
-We filter genes by mean_expression ≥ 0.5 and variance ≥ 0.1, then apply z-score normalization.
+We first CPM-normalize the data (when needed), filter for genes with mean expression ≥ 0.5 and variance ≥ 0.1, and then apply z-score normalization.
 
-```{r preprocess, message=FALSE}
+```{r preprocess, message=TRUE}
+#  CPM normalization
+dataWholeBlood_cpm <- cpmPLIER2(dataWholeBlood)
+
 # Filter and compute row statistics
 prep_wb <- preprocessPLIER2(
-  Y = dataWholeBlood,
+  Y = dataWholeBlood_cpm,
   mean_cutoff = 0.5,
   var_cutoff  = 0.1
 )
@@ -172,6 +172,7 @@ prep_wb <- preprocessPLIER2(
 # Extract filtered matrix and rowStats
 wb_Y_filtered <- prep_wb$Y_filtered
 wb_rowStats   <- prep_wb$rowStats
+
 
 # Z-score normalization
 wb_Y_z <- zscorePLIER2(
@@ -254,7 +255,7 @@ wb_fullRes <- PLIERfull(
   k                 = wb_k_pl,
   doCrossval        = TRUE,
   trace             = TRUE,
-  max.U.updates=50
+  max.U.updates     = 50
 )
 
 ```
@@ -264,8 +265,8 @@ wb_fullRes <- PLIERfull(
 ```{r summary-table}
 # Display significant latent variables
 wb_summary_df <- as.data.frame(wb_fullRes$summary) %>%
-  filter(FDR < 0.05 & AUC > 0.7) %>%
-  arrange(desc(AUC)) %>% 
+  dplyr::filter(FDR < 0.05 & AUC > 0.7) %>%
+  dplyr::arrange(FDR) %>% 
   dplyr::rename(LV='LV index') %>% 
   dplyr::mutate(LV=paste0('LV', LV)) %>% 
   dplyr::select(LV, pathway, FDR, AUC)
@@ -279,9 +280,10 @@ datatable(
   rownames = FALSE,
   class    = "stripe hover compact") %>%
   formatSignif(c("AUC", "FDR"), 3)
+
 ```
 
-In whole‑blood RNA‑Seq, PLIER2 latent variables recapitulate core immune and hematopoietic pathways, most notably Type I, α, and γ interferon signaling, nd reflect erythroid activity via heme metabolism. The “Whole Blood Male 70–79 Up” gene set captures transcriptional signatures in peripheral blood.
+In whole-blood RNA-Seq, PLIER2 latent variables recapitulate heme metabolism, mitochondrial ATP synthesis coupled electron transport (GO:0042775) and oxidative phosphorylation (GO:0006119), pathways essential for oxygen delivery and energy generation in blood. Heme metabolism reflects erythroid lineage activity and hemoglobin production in red blood cell precursors, while the mitochondrial ATP synthesis and oxidative phosphorylation components capture the bioenergetic demands of leukocytes and platelets during immune activation and hemostatic processes. The “Whole Blood Male 70–79 Up” gene set captures transcriptional signatures in peripheral blood.
 
 # Example 2: File-Backed Matrix (Alzheimer’s Brain)
 
@@ -295,6 +297,10 @@ fbm_base <- file.path(output_dir, "FBMalz")
 bk_paths <- paste0(fbm_base, c(".bk", ".bk_preproc.bk", ".bk_preproc_filtered.bk"))
 file.remove(bk_paths[file.exists(bk_paths)])
 ```
+
+### Computing CPM on a File-Backed Matrix (FBM)
+
+For file-backed matrices (FBMs), you can compute counts-per-million (CPM) in-place—without loading the entire dataset into RAM—using the `cpmPLIER2FBM()` function from **PLIER2**:
 
 ## 2. Load HDF5 expression
 
@@ -315,13 +321,14 @@ rownames(expr_mat) <- genes
 dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 alzFBM <- FBM(nrow = nrow(expr_mat), ncol = ncol(expr_mat), backingfile = fbm_base)
 blk <- 1000
+
 for(i in seq_len(ceiling(nrow(expr_mat)/blk))){
   rows <- ((i-1)*blk+1):min(i*blk, nrow(expr_mat))
   alzFBM[rows, ] <- expr_mat[rows, , drop = FALSE]
 }
 ```
 
-## 4. Preprocess and z‑score FBM
+## 4. CPM, preprocess and z‑score FBM
 
 ```{r fbm-preprocess, message=FALSE}
 prep_alz <- preprocessPLIER2FBM(
@@ -329,6 +336,7 @@ prep_alz <- preprocessPLIER2FBM(
   mean_cutoff= 0.5,
   var_cutoff = 0.1
 )
+
 alz_fbm_filt <- prep_alz$fbm_filtered
 alz_rowStats <- prep_alz$rowStats
 zscorePLIER2FBM(alz_fbm_filt, alz_rowStats)
@@ -392,15 +400,14 @@ alz_fullRes <- PLIERfull(
   k                 = PLIER_K_alz,
   doCrossval        = TRUE,
   trace             = TRUE,
-  max.U.updates=50
+  max.U.updates     = 50
 )
 ```
 
 ## 10. Display significant latent variables
-
 ```{r fbm-summary}
 alz_summary_df <- as.data.frame(alz_fullRes$summary) %>%
-  filter(FDR < 0.05 & AUC > 0.7) %>%
+  filter(FDR < 0.1 & AUC > 0.6) %>%
   arrange(FDR) %>% 
   dplyr::rename(LV='LV index') %>% 
   dplyr::mutate(LV=paste0('LV', LV)) %>% 
@@ -421,7 +428,7 @@ For the Alzheimer’s brain dataset, the leading latent variable matches the GTE
 
 # Example 3: Tab-Delimited Count File (Pancreatic Islets)
 
-In this example, we apply the in‑memory PLIER2 workflow to RNA‑Seq count data from GEO accession **GSE164416** (Wigger *et al.* 2021; “Multi‑omics profiling of living human pancreatic islet donors reveals heterogeneous beta cell trajectories towards type 2 diabetes”, DOI: 10.1038/s42255-021-00420-9). After preprocessing the raw counts and fitting the PLIER2 model, we perform a differential analysis of latent‑variable activities to compare non‑diabetic (ND) and type 2 diabetic (T2D) samples.
+In this example, we apply the in‑memory PLIER2 workflow to RNA‑Seq count data from GEO accession **GSE164416** (Wigger *et al.* 2021; “Multi‑omics profiling of living human pancreatic islet donors reveals heterogeneous beta cell trajectories towards type 2 diabetes”, DOI: 10.1038/s42255-021-00420-9). After preprocessing the raw counts and fitting the PLIER2 model, we perform a differential analysis of latent‑variable activities to compare non‑diabetic (ND) and type 2 diabetic (T2D) samples.
 
 ## 1. Load count data and map gene symbols
 
@@ -455,7 +462,7 @@ expr$symbol <- NULL
 expr <- as.matrix(expr)
 ```
 
-## 3. Preprocess and z-score
+## 3. CPM, preprocess and z-score
 
 ```{r islet-preprocess, message=FALSE}
 prep_is <- preprocessPLIER2(
@@ -463,6 +470,7 @@ prep_is <- preprocessPLIER2(
   mean_cutoff = 0.5,
   var_cutoff  = 0.1
 )
+
 iso_Yf   <- prep_is$Y_filtered
 iso_rowS <- prep_is$rowStats
 iso_Yz   <- zscorePLIER2(Y_filtered = iso_Yf, rowStats = iso_rowS)
@@ -511,6 +519,7 @@ islet_gmtList <- list(
   Diabetes_Perturbations = getGMT('https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=Diabetes_Perturbations_GEO_2022'),
   MSigDB_Hallmark       = getGMT('https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=MSigDB_Hallmark_2020')
 )
+
 islet_pathMat <- gmtListToSparseMat(islet_gmtList)
 islet_matched <- getMatchedPathwayMat(islet_pathMat, rownames(iso_Yz))
 islet_chatObj <- getChat(islet_matched)
@@ -528,7 +537,7 @@ islet_fullRes <- PLIERfull(
   k                 = PLIER_K_is,
   doCrossval        = TRUE,
   trace             = TRUE,
-  max.U.updates=50
+  max.U.updates     = 50
 )
 ```
 
@@ -537,7 +546,7 @@ islet_fullRes <- PLIERfull(
 ```{r islet-summary}
 islet_summary_df <- as.data.frame(islet_fullRes$summary) %>%
   filter(FDR < 0.05 & AUC > 0.7) %>%
-  arrange(desc(AUC)) %>% 
+  arrange(FDR) %>% 
   dplyr::rename(LV='LV index') %>% 
   dplyr::mutate(LV=paste0('LV', LV)) %>% 
   dplyr::select(LV, pathway, FDR, AUC)

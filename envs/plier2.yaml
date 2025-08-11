@@ -4,7 +4,7 @@ channels:
   - bioconda
   - defaults
 dependencies:
-  - r-base=4.3.*
+  - r-base=4.4.*
   - hdf5
   - r-hdf5r
   - bioconductor-rhdf5
@@ -25,7 +25,6 @@ dependencies:
   - r-knitr
   - r-pkgdown
 
-
   # Jupyter support
   - jupyterlab
   - notebook
@@ -37,8 +36,8 @@ dependencies:
   - bioconductor-recount3
   - bioconductor-preprocesscore
   - bioconductor-fgsea
-  - bioconda::r-archr
   - bioconductor-org.Hs.eg.db
+  - bioconductor-ensdb.hsapiens.v86
 
   # Other R utilities
   - r-plyr
