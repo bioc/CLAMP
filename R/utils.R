@@ -185,22 +185,22 @@ max_correspondence_greedy <- function(cor_mat) {
 #' @export
 #'
 getGMT <- function(url, name = NULL, cache_dir = NULL, redownload = FALSE) {
-if (is.null(name)) {
-  name <- sub(".*[=]", "", url)
-  message("Auto-detected name: ", name)
-}
-if (is.null(cache_dir)) {
-  cache_dir <- system.file("extdata", package = "PLIER2")
-}
-cache_file <- file.path(cache_dir, paste0(name, ".gmt"))
-if (!file.exists(cache_file) || redownload) {
-  message("Downloading ", name, " from Enrichr...")
-  if (!dir.exists(cache_dir)) dir.create(cache_dir, recursive = TRUE)
-  download.file(url, cache_file)
-} else {
-  message("Using cached file for ", name)
-}
-read_gmt(cache_file)
+  if (is.null(name)) {
+    name <- sub(".*[=]", "", url)
+    message("Auto-detected name: ", name)
+  }
+  if (is.null(cache_dir)) {
+    cache_dir <- system.file("extdata", package = "PLIER2")
+  }
+  cache_file <- file.path(cache_dir, paste0(name, ".gmt"))
+  if (!file.exists(cache_file) || redownload) {
+    message("Downloading ", name, " from Enrichr...")
+    if (!dir.exists(cache_dir)) dir.create(cache_dir, recursive = TRUE)
+    download.file(url, cache_file)
+  } else {
+    message("Using cached file for ", name)
+  }
+  read_gmt(cache_file)
 }
 
 
@@ -613,3 +613,324 @@ preprocessPLIER2 <- function(Y, mean_cutoff = 0, var_cutoff = 0) {
   ))
 }
 
+#' visualize the top genes contributing to the LVs
+#'
+#' @param plierRes the result returned by PLIER
+#' @param data the data to be displayed in a heatmap, typically the z-scored input data (or some subset thereof)
+#' @param priorMat the same gene by geneset binary matrix that was used to run PLIER
+#' @param top the top number of genes to use
+#' @param index the subset of LVs to display
+#' @param allLVs plot even the LVs that have no pathway association
+#' @param ... Additional arguments to be passed to pheatmap, such as a column annotation data.frame (annotation_col). See ?pheatmap for details.
+#' @export
+plotTopZ=function(plierRes, data, priorMat, top=10, index=NULL, allLVs=F,...){
+  data=data[rownames(plierRes$Z),]
+  priorMat=priorMat[rownames(plierRes$Z),]
+  ii=which(colSums(plierRes$U)>0)
+  if(!allLVs){
+    if(! is.null(index)){
+      ii=intersect(ii,index)
+    }
+  }
+  else{
+    ii=index
+  }
+
+  tmp=apply(-plierRes$Z[, ii, drop=F],2,rank)
+  nn=character()
+  nncol=character()
+  nnpath=character()
+  nnindex=double()
+  for (i in 1:length(ii)){
+    nn=c(nn,nntmp<-names(which(tmp[,i]<=top)))
+    nncol=c(nncol, rep(rownames(plierRes$B)[ii[i]], length(nntmp)))
+    nnpath=c(nnpath,rowSums(priorMat[nntmp,plierRes$U[,ii[i]]>0, drop=F])>0)
+    nnindex=c(nnindex,rep(ii[i], length(nntmp)))
+
+  }
+  names(nncol)=nn
+  nncol=strtrim(nncol, 30)
+
+  nnrep=names(which(table(nn)>1))
+  if(length(nnrep)>0){
+    nnrep.im=match(nnrep,nn)
+    nn=nn[-nnrep.im]
+    nncol=nncol[-nnrep.im]
+    nnpath=nnpath[-nnrep.im]
+    nnindex=c(nnindex,rep(ii[i], length(nntmp)))
+
+  }
+  nnpath[nnpath=="TRUE"]="inPathway"
+  nnpath[nnpath=="FALSE"]="notInPathway"
+
+  nncol=as.data.frame(list(nncol,nnpath))
+
+  names(nncol)=c("pathway", "present")
+  ll=c(inPathway="black", notInPathway="beige")
+
+  anncol=list(present=ll)
+  toPlot=tscale(data[nn,])
+
+
+
+  maxval=max(abs(toPlot))
+
+  pheatmap(toPlot, breaks=seq(-maxval, maxval, length.out = 99),color=colorpanel(100, "green", "white", "red"),annotation_row=nncol, show_colnames = F, annotation_colors = anncol, ...)
+}
+
+
+
+
+
+library(ComplexHeatmap)
+library(circlize)
+
+plotTopZ_Complex = function(plierRes, data, priorMat, top = 10, top.pathway = 5,
+                            index = NULL, allLVs = FALSE, Zheat=FALSE) {
+  data = data[rownames(plierRes$Z), ]
+  priorMat = priorMat[rownames(plierRes$Z), ]
+
+  ii = which(colSums(plierRes$U) > 0)
+  if (!allLVs) {
+    if (!is.null(index)) ii = intersect(ii, index)
+  } else {
+    ii = index
+  }
+
+  tmp = apply(-plierRes$Z[, ii, drop = FALSE], 2, rank)
+  nn = unique(unlist(apply(tmp, 2, function(x) names(which(x <= top)))))
+  nn=unique(sort(nn))
+
+  data_sub = t(scale(t(data[nn, , drop = FALSE])))
+
+  # build annotation for genes: inPathway or not
+  nnpath = sapply(seq_along(ii), function(i) {
+    gene_idx = match(nn, rownames(priorMat))
+    col_idx = which(plierRes$U[, ii[i]] > 0)
+    Matrix::rowSums(priorMat[gene_idx, col_idx, drop = FALSE]) > 0
+
+
+  })
+  nnpath = rowSums(nnpath) > 0
+  gene_annot = rowAnnotation(present = nnpath,
+                             col = list(present = c("TRUE" = "black", "FALSE" = "beige")))
+
+  # build gene × top pathway binary matrix
+  top_pathways = unique(unlist(lapply(ii, function(i) {
+    names(sort(plierRes$U[, i], decreasing = TRUE))[1:top.pathway]
+  })))
+  gene_idx=match(nn, rownames(priorMat))
+  path_idx=match(top_pathways, colnames(priorMat))
+  pathway_mat = priorMat[gene_idx, path_idx, drop = FALSE]
+  pathway_mat = as.matrix(pathway_mat > 0)
+  pathway_mat=pathway_mat[, colSums(pathway_mat)>0]
+
+  ht1 = Heatmap(data_sub,
+                name = "expression",
+                show_row_names = TRUE,
+                show_column_names = FALSE,
+                cluster_rows = TRUE,
+
+                cluster_columns = TRUE,
+                width = unit(7, "cm"),
+                row_dend_width = unit(0, "mm"))
+
+  col_fun = circlize::colorRamp2(c(0, 1), c("white", "black"))
+
+  ht2 = Heatmap(pathway_mat+1-1,
+                name = "in pathway",
+                #      col = c("TRUE" = "red", "FALSE" = "white"),
+                show_row_names = TRUE,
+                col = col_fun,
+                show_column_names = TRUE,
+                cluster_rows = FALSE,
+                cluster_columns = FALSE,
+                column_names_rot = 45,
+                row_names_gp = gpar(fontsize = 8),
+                column_names_gp = gpar(fontsize = 8),
+                row_dend_width = unit(0, "mm"),
+                width = unit(6, "cm")
+  )
+  if(Zheat){
+    gene_idx=match(nn, rownames(plierRes$Z))
+    z_sub = scale(plierRes$Z[gene_idx, index, drop = FALSE], center = F)
+
+    z_col_fun = circlize::colorRamp2(c(0, max(z_sub, na.rm = TRUE)),
+                                     c("#e5f5e0", "#31a354"))
+
+    ht_z = Heatmap(z_sub,
+                   name = "Z",
+                   col = z_col_fun,
+                   cluster_rows = TRUE,
+                   cluster_columns = TRUE,
+                   show_row_names = TRUE,
+                   show_column_names = TRUE,
+                   column_names_rot = 90,
+                   column_names_gp = gpar(fontsize = 10),
+                   width = unit(1, "cm"))
+
+  }
+  lv_labels = colnames(plierRes$Z)[max.col(scale(plierRes$Z,center = F), ties.method = "first")]
+  names(lv_labels) = rownames(plierRes$Z)
+  gene_lv = lv_labels[rownames(data_sub)]
+
+  set.seed(1)
+  row_annot = rowAnnotation(LV = gene_lv,
+                            #    col = list(LV = lv_colors),
+                            show_annotation_name = FALSE)
+  if(!Zheat){
+    draw(row_annot+ht1 + ht2 , row_dend_side = "left")
+  }
+  else{
+    draw(row_annot+ht_z+ht1 + ht2 , row_dend_side = "left")
+  }
+}
+
+library(Matrix)
+library(matrixStats)
+
+corQuantile <- function(expr, pathways, quant = 0.75) {
+  expr <- as.matrix(expr)
+  pathways <- as(pathways, "dgCMatrix")
+
+  result <- numeric(ncol(pathways))
+  names(result) <- colnames(pathways)
+
+  for (j in seq_len(ncol(pathways))) {
+    genes_in_path <- which(pathways[, j] != 0)
+    if (length(genes_in_path) >= 2) {
+      sub_expr <- expr[genes_in_path, , drop = FALSE]
+      cmat <- cor(t(sub_expr))
+      result[j] <- quantile(cmat[lower.tri(cmat)], quant)
+    } else {
+      result[j] <- NA
+    }
+  }
+
+  return(result)
+}
+
+
+getCorrelationMat<-function(zscore_data){
+  cor_mat=tcrossprod(zscore_data)/(ncol(zscore_data)+1)
+}
+
+
+
+upper_outlier_threshold <- function(x, coef = 2) {
+  qs <- quantile(x, probs = c(0.25, 0.75), names = FALSE, type = 7, na.rm = TRUE)
+  iqr <- qs[2] - qs[1]
+ qs[2] + coef * iqr
+
+}
+
+
+
+pathway_summary_with_eigengene <- function(expr, pathways, quant = 0.75, gene_cor_thresh = 0.5) {
+  expr <- as.matrix(expr)
+
+  pathways <- as(pathways, "dgCMatrix")
+
+  quant_vec <- numeric(ncol(pathways))
+
+  strong_gene_list <- vector("list", ncol(pathways))
+  names(quant_vec)  <- names(strong_gene_list) <- colnames(pathways)
+
+  for (j in seq_len(ncol(pathways))) {
+    genes <- which(pathways[, j] != 0)
+    if (length(genes) >= 2) {
+      # quantile of gene-gene correlation
+      cvals <- cor_mat[genes, genes]
+      quant_vec[j] <- quantile(cvals[lower.tri(cvals)], quant)
+
+      # compute eigengene (1st PC of gene expression)
+      e <- expr[genes, , drop = FALSE]
+      svd_res <- svd(scale(e, center = TRUE, scale = FALSE), nu = 0, nv = 1)
+      eigengene <- svd_res$v[, 1]
+
+      # enforce positive orientation
+      avg_cor <- mean(cor(eigengene, t(e)))
+      if (avg_cor < 0) eigengene <- -eigengene
+
+
+
+      # identify genes with correlation > threshold
+      gene_corrs <- cor(eigengene, t(e))
+      strong_genes <- rownames(e)[which(gene_corrs > gene_cor_thresh)]
+      strong_gene_list[[j]] <- strong_genes
+
+    } else {
+      quant_vec[j] <- NA
+      strong_gene_list[[j]] <- character(0)
+    }
+  }
+
+  data.frame(
+    pathway = colnames(pathways),
+    cor_quantile = quant_vec,
+    strong_genes = I(strong_gene_list),
+    row.names = NULL
+  )
+}
+
+combinePlierBaseResults=function(plierBase1, plierBase2){
+  ncol1=ncol(plierBase1$Z)
+  ncol2=ncol(plierBase2$Z)
+  if(!all (rownames(plierBase2$Z) %in% rownames(plierBase1$Z))){
+    message("genes in plierBase2 must be a subset of genes in plierBase1")
+  }
+  padZ=matrix(0,nrow=nrow(plierBase1$Z), ncol=ncol2)
+  plierBase1$Z=cbind(plierBase1$Z, padZ)
+  plierBase1$Z[rownames(plierBase2$Z), (ncol1+1):(ncol1+ncol2)]=plierBase2$Z
+  plierBase1$B=rbind(plierBase1$B, plierBase2$B)
+  colnames(plierBase1$Z)<-rownames(plierBase1$B)<-paste("LV", 1:ncol(plierBase1$Z))
+plierBase1
+}
+
+
+findSplineMax <- function(x, y, n = 1000, spar = NULL) {
+  fit <- smooth.spline(x, y, spar = spar)
+  grid <- seq(min(x), max(x), length.out = n)
+  pred <- predict(fit, grid)
+  max_idx <- which.max(pred$y)
+  list(x = pred$x[max_idx], y = pred$y[max_idx])
+}
+
+squashZscore=function(zdata, maxScore=2){
+  2*tanh(zdata/2)
+}
+
+
+allAgainstAllTstats <- function(B, target) {
+  B <- as.matrix(B)  # samples × features
+  target <- as.matrix(target)  # samples × targets
+
+  n_pos <- colSums(target == 1)
+  n_neg <- colSums(target == 0)
+
+  mu1 <- crossprod(target == 1, B) / n_pos     # targets × features
+  mu0 <- crossprod(target == 0, B) / n_neg
+
+  var1 <- crossprod(target == 1, B^2) / n_pos - mu1^2
+  var0 <- crossprod(target == 0, B^2) / n_neg - mu0^2
+
+  se <- sqrt(var1 / n_pos + var0 / n_neg)
+  t_stats <- (mu1 - mu0) / se
+
+  return(t_stats)  # targets × features
+}
+
+allAgainstAllAUCs=function(B, target){
+  B=as.matrix(B)
+  ranks <- colRanks(B, ties.method = "average")  # rows = samples, cols = features
+
+  n_pos <- colSums(target == 1)
+  n_neg <- colSums(target == 0)
+  show(dim(target))
+  show(dim(ranks))
+  pos_mean_rank <-  ranks %*% (target == 1)
+  pos_mean_rank=sweep(pos_mean_rank,2,n_pos*(n_pos+1)/2, "-")
+  #  / n_pos  # targets × features
+  auc_matrix <- sweep(pos_mean_rank, 2, (n_pos) *n_neg, "/")  # targets × features
+
+}

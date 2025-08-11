@@ -315,7 +315,7 @@ solveU=function(Z,  Chat=NULL, priorMat, penalty.factor,pathwaySelection="fast",
   colnames(U)=paste("LV", 1:ncol(U))
 
 
-  U <- as.matrix(U)
+#  U <- as.matrix(U)
 
   return(list(U = U))
 
@@ -538,7 +538,7 @@ crossVal<-function(plierRes,priorMat, priorMatcv){
   out=data.frame(out,stringsAsFactors = F)
   out[,3]=as.numeric(out[,3])
   out[,4]=as.numeric(out[,4])
-  out[,5]=BH(out[,4])
+  out[,5]=BH(10^(-out[,4])) #p-value is logged
   colnames(out)=c("pathway", "LV index", "AUC", "p-value", "FDR")
   return(list(Uauc=Uauc, Upval=Up, summary=out))
 }
@@ -1016,7 +1016,7 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
 
         }
         U=res$U
-
+        message(class(U))
         num.U.updates=num.U.updates+1
 
         iter.full=iter.full+iter.full.start
@@ -1117,6 +1117,8 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
     out$Z=Z
     out$Uauc=outAUC$Uauc
     out$Up=outAUC$Upval
+    rownames(out$Uauc)=rownames(U)
+    rownames(out$Up)=rownames(U)
     out$summary=outAUC$summary
     out$priorMatCV=priorMatCV
     out$priorMat=priorMat
