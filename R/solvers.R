@@ -23,7 +23,7 @@ library(glmnet)
 #'
 #' @param p Numeric vector of p-values.
 #' @return Adjusted p-values.
-BH <-function(p){p.adjust(p, method="BH")}
+BH <- function(p){p.adjust(p, method="BH")}
 
 #' Row-wise correlation between two matrices
 #'
@@ -51,12 +51,13 @@ row_cor <- function(A, B) {
 #'
 #' @param mat1 A matrix or an object of class \code{FBM}.
 #' @param mat2 A numeric matrix.
+#' @param ncores Number of cores to use for parallel computation (only used if mat1 is an FBM). Default is 1.
 #' @return Matrix product of \code{mat1} and \code{mat2}.
-mat_mult <- function(mat1, mat2) {
-  is_fbm <- inherits(mat1, "FBM")
+mat_mult <- function(mat1, mat2, ncores=1) {
+  is_fbm <- inherits(mat1, "FBM") 
   if (is_fbm ) {
     # For FBM objects, use the specific multiplication method
-    return(big_prodMat(mat1, as.matrix(mat2)))
+    return(big_prodMat(mat1, as.matrix(mat2), ncores=ncores))
   } else {
     # Regular matrix multiplication
     return(mat1 %*% mat2)
@@ -573,10 +574,9 @@ crossVal<-function(plierRes,priorMat, priorMatcv){
 #' @param scale Scaling factor for L1 and L2 when not provided. Default is 1.
 #' @param pos.adj Positive constraint adjustment divisor for L1. Default is 3.
 #' @param adaptive.p Controls adaptive sparsity in \code{Z}. After each ALS update, negative entries in \code{Z} are assumed to reflect noise. The cutoff for thresholding is set according to the probability of positive values under a reflected negative distribution—effectively zeroing out small positive entries likely to be noise. Smaller values lead to more sparsity. Default is 0.05.
-#'
 #' @param adaptive.iter Number of iterations before adaptive sparsity is applied. Default is 20.
 #' @param cutoff Scalar threshold to zero Z values when \code{Zpos = TRUE} and adaptive thresholding is not used. Default is 0.
-#'
+#' @param ncores Number of cores to use for parallel computation (only used if Y is an FBM). Default is 1.
 #' @return A list with components:
 #' \describe{
 #'   \item{\code{B}}{Latent variable loadings (LVs x genes)}
@@ -603,7 +603,7 @@ crossVal<-function(plierRes,priorMat, priorMatcv){
 #' @export
 PLIERbase=function(Y, k,svdres=NULL,  L1=NULL, L2=NULL,
                    Zpos=T,max.iter=200, tol=5e-4, trace=F,
-                   rseed=NULL, B=NULL, scale=1, pos.adj=3, adaptive.p=0.05, adaptive.iter=20,  cutoff=0){
+                   rseed=NULL, B=NULL, scale=1, pos.adj=3, adaptive.p=0.05, adaptive.iter=20, cutoff=0, ncores=1){
 
 
   #message("Checking type")
@@ -694,8 +694,8 @@ PLIERbase=function(Y, k,svdres=NULL,  L1=NULL, L2=NULL,
   for ( i in 1:max.iter){
 
     #main loop
-    Zraw=Z=mat_mult(Y,t(B))%*%solve(tcrossprod(B)+L1*diag(k))
-
+    Zraw=Z=mat_mult(Y,t(B), ncores=ncores)%*%solve(tcrossprod(B)+L1*diag(k))
+    
     if(i>=adaptive.iter && adaptive.p>0){
 
 
@@ -713,12 +713,12 @@ PLIERbase=function(Y, k,svdres=NULL,  L1=NULL, L2=NULL,
     oldB=B
 
     if(is_fbm){
-      ZYt=big_cprodMat(Y, as.matrix(Z))
+      ZYt=big_cprodMat(Y, as.matrix(Z), ncores=ncores)
       ZY=Matrix::t(ZYt)
       B=solve(Matrix::t(Z)%*%Z+L2k)%*%ZY
     }
     else{
-      B=solve(Matrix::t(Z)%*%Z+L2k)%*%mat_mult(Matrix::t(Z),Y)
+      B=solve(t(Z)%*%Z+L2k)%*%mat_mult(t(Z),Y,ncores=ncores)
     }
 
     #update error

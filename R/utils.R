@@ -14,7 +14,6 @@ tscale <- function(x) {
   sweep(sweep(x, 1, row_means), 1, row_sds, "/")
 }
 
-
 # #' Compare latent variable loadings against a target using correlation or other statistics
 # #'
 # #' This function compares two sets of latent variable loadings (`res1`, `res2`) with respect to a binary or continuous
@@ -140,7 +139,7 @@ mymessage <- function(...) {
 #' @param verbose Logical; if `TRUE`, prints counts of LVs exceeding AUC thresholds. Default is `FALSE`.
 #'
 #' @return A data frame with columns LV index and max_AUC.
-getMaxAUC=function(summary, verbose=F){
+getMaxAUC <- function(summary, verbose=F){
 
   max_auc_per_lv <- summary %>%
     group_by(.data$`LV index`) %>%
@@ -154,7 +153,6 @@ getMaxAUC=function(summary, verbose=F){
   max_auc_per_lv
 }
 
-
 #' Count number of latent variables exceeding AUC thresholds
 #'
 #' Given a summary data frame from cross-validation, reports the number of latent variables
@@ -167,7 +165,6 @@ getAUCstats=function(summary){
   out=getMaxAUC(summary)
   unlist(lapply(c(0.7,0.8, 0.9), function(x){sum(out$max_AUC>x)}))
 }
-
 
 #' Greedy maximum correspondence from correlation matrix
 #'
@@ -332,7 +329,7 @@ commonRows=function(data1, data2){
 #' transformation in-place. If any NA values are detected, they are replaced with 0.
 #'
 #' @param fbm A `bigmemory::FBM` or `bigstatsr::FBM` object.
-#'
+#' @param ncores Integer; number of cores to use for parallel operations (default 1).
 #' @return A list with:
 #'   \describe{
 #'     \item{max_value}{The maximum value encountered in the FBM (after log transformation if applied).}
@@ -342,39 +339,55 @@ commonRows=function(data1, data2){
 #' @details
 #' Modifies the FBM in place. Uses `bigstatsr::big_apply()` to process in parallel-safe chunks.
 #' @importFrom bigstatsr big_apply rows_along FBM
-cleanFBM=function(fbm){
-  # SCheck for NA and max value
-  max_value <- -Inf
-  has_na <- FALSE
+cleanFBM <- function(fbm, ncores = 1) {
+  # 1. Block‐wise scan for max and NA
+  stats <- big_apply(
+    fbm,
+    a.FUN = function(X, ind) {
+      vals <- X[, ind, drop = FALSE]
+      list(
+        max  = if (all(is.na(vals))) NA_real_ else max(vals, na.rm = TRUE),
+        na   = anyNA(vals)
+      )
+    },
+    a.combine = function(...) {
+      Reduce(function(a, b) {
+        list(
+          max = max(a$max, b$max, na.rm = TRUE),
+          na  = a$na  || b$na
+        )
+      }, list(...))
+    },
+    ind        = cols_along(fbm),
+    ncores     = ncores,
+  )
 
-  big_apply(fbm, a.FUN = function(X, ind) {
-    max_value <<- max(max_value, max(X[ind, ], na.rm = TRUE))
-    if (anyNA(X[ind, ])) {
-      has_na <<- TRUE
-    }
-    NULL  # No return, just updating global values
-  }, ind = rows_along(fbm))
+  max_value <- stats$max
+  has_na    <- stats$na
 
-  # Log2 transform if necessary
-  if (max_value >= 100) {
+  # 2. Log2 transform if necessary
+  if (!is.na(max_value) && max_value >= 100) {
     message("Applying log2 transformation")
-    big_apply(fbm, a.FUN = function(X, ind) {
-      X[ind, ] <- log2(X[ind, ] + 1)
-    }, ind = rows_along(fbm))
-  }
-  else{
-    message("Already on log scale")
+    big_apply(
+      fbm,
+      a.FUN     = function(X, ind) { X[, ind] <- log2(X[, ind] + 1); NULL },
+      ind       = cols_along(fbm),
+      ncores    = ncores,
+    )
+  } else {
+    message("Already on log scale or all NA")
   }
 
-  # Fill NAs with 0 if necessary
+  # 3. Fill NAs if present
   if (has_na) {
     message("Filling NAs with 0")
-    big_apply(fbm, a.FUN = function(X, ind) {
-      X[ind, ][is.na(X[ind, ])] <- 0
-      NULL
-    }, ind = rows_along(fbm))
-  }
-  else{
+    big_apply(
+      fbm,
+      a.FUN     = function(X, ind) { X[, ind][is.na(X[, ind])] <- 0; NULL },
+      ind       = cols_along(fbm),
+      ncores    = ncores,
+    )
+  } else {
     message("No NA values found")
   }
 
@@ -388,38 +401,36 @@ cleanFBM=function(fbm){
 #'
 #' @param fbm A `bigstatsr::FBM` object.
 #' @param chunk_size Number of columns to process at a time. Default is 1000.
-#'
+#' @param ncores Integer; number of cores to use for parallel operations (default 1).
 #' @return A list with two numeric vectors:
 #' \describe{
 #'   \item{row_sums}{Sum of each row.}
 #'   \item{row_sums_sq}{Sum of squares of each row.}
 #' }
 #'
-computeRowStatsFBM <- function(fbm, chunk_size = 1000) {
-  n_rows <- nrow(fbm)
+computeRowStatsFBM <- function(fbm, ncores = 1) {
+  # Compute row sums in blocks
+  row_sums <- big_apply(
+    fbm,
+    a.FUN     = function(X, ind) rowSums(X[, ind]),
+    a.combine = "plus",
+    ncores    = ncores
+  )
+
+  # Compute row sums of squares in blocks
+  row_sums_sq <- big_apply(
+    fbm,
+    a.FUN     = function(X, ind) rowSums(X[, ind]^2),
+    a.combine = "plus",
+    ncores    = ncores
+  )
+
   n_cols <- ncol(fbm)
-
-  # Initialize vectors to store row sums and row sums of squares
-  row_sums <- numeric(n_rows)
-  row_sums_sq <- numeric(n_rows)
-
-  # Iterate over columns in chunks
-  for (start_col in seq(1, n_cols, by = chunk_size)) {
-    end_col <- min(start_col + chunk_size - 1, n_cols)
-
-    # Extract the current chunk of columns
-    col_chunk <- fbm[, start_col:end_col]
-
-    # Update row sums and sums of squares
-    row_sums <- row_sums + rowSums(col_chunk)
-    row_sums_sq <- row_sums_sq + rowSums(col_chunk^2)
-  }
-
-  # Compute row means and variances
-  row_means <- row_sums / n_cols
+  # Final means and variances
+  row_means     <- row_sums / n_cols
   row_variances <- (row_sums_sq / n_cols) - (row_means^2)
 
-  return(list(row_means = row_means, row_variances = row_variances))
+  list(row_means = row_means, row_variances = row_variances)
 }
 
 #' Filter rows of a Filebacked Big Matrix based on mean and variance
@@ -441,7 +452,7 @@ computeRowStatsFBM <- function(fbm, chunk_size = 1000) {
 #' @details
 #' This function creates a new FBM and copies over only the rows that pass the filtering criteria.
 #' The original FBM is unchanged.
-filterFBM<- function(fbm, rowStats, mean_cutoff = NULL, var_cutoff = NULL, backingfile = "filtered_fbm") {
+filterFBM <- function(fbm, rowStats, mean_cutoff = NULL, var_cutoff = NULL, backingfile = "filtered_fbm") {
   row_means <- rowStats$row_means
   row_variances <- rowStats$row_variances
 
@@ -540,6 +551,7 @@ zscorePLIER2 <- function(Y_filtered, rowStats) {
 #' @param var_cutoff  Numeric or NULL. Minimum row variance to keep (NULL = no var filter).
 #' @param backingfile Character or NULL. Base name for the *copy* FBM and filtered FBM on disk.
 #'                    If NULL, defaults to paste0(fbm$backingfile, "_preproc") and "_filtered".
+#' @param ncores Integer; number of cores to use for parallel operations (default 1).
 #' @return A list with:
 #'   \item{fbm_filtered}{The filtered FBM (writable).}
 #'   \item{rowStats}{List with row_means & row_variances for fbm_filtered.}
@@ -561,26 +573,47 @@ zscorePLIER2 <- function(Y_filtered, rowStats) {
 preprocessPLIER2FBM <- function(fbm,
                                 mean_cutoff = NULL,
                                 var_cutoff  = NULL,
-                                backingfile = NULL) {
+                                backingfile = NULL,
+                                ncores = 1) {
+  
+  n_r <- nrow(fbm)
+  n_c <- ncol(fbm)
+
   # Choose base names
   base_bk <- if (is.null(backingfile)) paste0(fbm$backingfile, "_preproc") else backingfile
 
   # Make a writable copy
   fbm_copy <- FBM(
-    nrow        = nrow(fbm),
-    ncol        = ncol(fbm),
+    nrow        = n_r,
+    ncol        = n_c,
     backingfile = base_bk,
     create_bk   = TRUE
   )
+
   # copy all data
-  fbm_copy[] <- fbm[]
+  for (rs in seq(1, n_r, by = block_size)) {
+    rows <- rs:min(rs + block_size - 1L, n_r)
+    fbm_copy[rows, ] <- fbm[rows, ]
+  }
+
+  if (ncores > 1) {
+    # if we are parallelizing, then disable BLAS parallelization
+    options(bigstatsr.check.parallel.blas = FALSE)
+    blas_nproc <- getOption("default.nproc.blas")
+    options(default.nproc.blas = NULL)
+  }
 
   # Clean in-place (log2 if needed, fill NAs)
-  cleanFBM(fbm_copy)
+  cleanFBM(fbm_copy, ncores)
 
   # Compute row stats on cleaned copy
-  rs_all <- computeRowStatsFBM(fbm_copy)
+  rs_all <- computeRowStatsFBM(fbm_copy, ncores)
 
+  if (ncores > 1) {
+    options(bigstatsr.check.parallel.blas = TRUE)
+    options(default.nproc.blas = blas_nproc)
+  }
+  
   # Filter rows, writing to a new filtered FBM
   filt_bk <- paste0(base_bk, "_filtered")
   filter_res <- filterFBM(
@@ -613,6 +646,7 @@ preprocessPLIER2FBM <- function(fbm,
 #' @param fbm_filtered A bigstatsr::FBM produced by preprocessPLIER2FBM().
 #' @param rowStats A list with row_means and row_variances from that FBM.
 #' @param chunk_size Columns per block (default 1000).
+#' @param ncores Integer; number of cores to use for parallel operations (default 1).
 #' @examples
 #' library(bigstatsr)
 #' fbm <- FBM(nrow = 2, ncol = 4,
@@ -623,22 +657,46 @@ preprocessPLIER2FBM <- function(fbm,
 #' )
 #' zscorePLIER2FBM(fbm, stats, chunk_size = 2)
 #' @export
-zscorePLIER2FBM <- function(fbm_filtered, rowStats, chunk_size = 1000) {
+zscorePLIER2FBM <- function(fbm_filtered, rowStats, chunk_size = 1000, ncores = 1) {
   message("Applying Z-score transformation")
   means <- rowStats$row_means
   sds   <- sqrt(rowStats$row_variances)
   sds[sds == 0] <- 1
 
-  for (start in seq(1, ncol(fbm_filtered), by = chunk_size)) {
-    end <- min(start + chunk_size - 1, ncol(fbm_filtered))
-    mat <- fbm_filtered[, start:end]
-    mat <- sweep(mat, 1, means, FUN = "-")
-    mat <- sweep(mat, 1, sds,   FUN = "/")
-    fbm_filtered[, start:end] <- mat
+  # Build column chunks
+  inds <- split(seq_len(ncol(fbm_filtered)),
+                ceiling(seq_len(ncol(fbm_filtered)) / chunk_size))
+
+  # Avoid BLAS oversubscription when using >1 core
+  if (ncores > 1) {
+    options(bigstatsr.check.parallel.blas = FALSE)
+    old_blas <- getOption("default.nproc.blas")
+    options(default.nproc.blas = NULL)
+    on.exit({
+      options(bigstatsr.check.parallel.blas = TRUE)
+      options(default.nproc.blas = old_blas)
+    }, add = TRUE)
   }
+
+  bigstatsr::big_apply(
+    fbm_filtered,
+    a.FUN = function(X, ind, means, sds) {
+      block <- X[, ind, drop = FALSE]
+      block <- sweep(block, 1, means, "-")
+      block <- sweep(block, 1, sds,   "/")
+      X[, ind] <- block
+      integer(0)  # minimal return to keep memory low
+    },
+    a.combine = "c",
+    ind       = inds,
+    ncores    = ncores,
+    means     = means,
+    sds       = sds
+  )
 
   invisible(NULL)
 }
+
 
 #' Preprocess an expression matrix for PLIER2
 #'
