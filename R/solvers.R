@@ -605,6 +605,12 @@ PLIERbase=function(Y, k,svdres=NULL,  L1=NULL, L2=NULL,
                    Zpos=T,max.iter=200, tol=5e-4, trace=F,
                    rseed=NULL, B=NULL, scale=1, pos.adj=3, adaptive.p=0.05, adaptive.iter=20, cutoff=0, ncores=1){
 
+  if (ncores > 1) {
+    # if we are parallelizing, then disable BLAS parallelization
+    options(bigstatsr.check.parallel.blas = FALSE)
+    blas_nproc <- getOption("default.nproc.blas")
+    options(default.nproc.blas = NULL)
+  }
 
   #message("Checking type")
   # Detect matrix type
@@ -718,7 +724,7 @@ PLIERbase=function(Y, k,svdres=NULL,  L1=NULL, L2=NULL,
       B=solve(Matrix::t(Z)%*%Z+L2k)%*%ZY
     }
     else{
-      B=solve(t(Z)%*%Z+L2k)%*%mat_mult(t(Z),Y,ncores=ncores)
+      B=solve(Matrix::t(Z)%*%Z+L2k)%*%mat_mult(Matrix::t(Z),Y, ncores=ncores)
     }
 
     #update error
@@ -754,6 +760,12 @@ PLIERbase=function(Y, k,svdres=NULL,  L1=NULL, L2=NULL,
   }
   rownames(B)=colnames(Z)=paste("LV",1:k)
   return(list(B=B, Z=Z, Zraw=Zraw, L1=L1, L2=L2))
+
+  if (ncores > 1) {
+  # restore previous state
+  options(bigstatsr.check.parallel.blas = TRUE)
+  options(default.nproc.blas = blas_nproc)
+  }
 }
 
 #' Full PLIER model with prior information and cross-validation
@@ -793,7 +805,7 @@ PLIERbase=function(Y, k,svdres=NULL,  L1=NULL, L2=NULL,
 #' @param useRaw If \code{TRUE}, uses unthresholded Z for solving U. Default is \code{TRUE}.
 #' @param refitAll If \code{TRUE}, refits all U columns every update. Default is \code{FALSE}.
 #' @param useSE Logical; passed to the internal \code{solveU()} call. If \code{TRUE}, enables standard-error–aware selection when fitting U (pathway coefficients). Default is \code{FALSE}.
-#'
+#' @param ncores Number of cores to use for parallel computation (only used if Y is an FBM). Default is 1.
 #' @return A list with the following components:
 #' \describe{
 #'   \item{\code{B}}{Latent variable loadings (LVs x genes)}
@@ -830,9 +842,14 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
                    penalty.factor=rep(1,ncol(priorMat)), glm_alpha=0.9,
                    minGenes=10, tol=5e-4, seed=123456, allGenes=F, rseed=NULL,
                    max.U.updates=5, pathwaySelection=c("fast"), multiplier=1,
-                   adaptive.p=0.05, useNNLS=T, useRaw=T, refitAll=F, useSE=F){
+                   adaptive.p=0.05, useNNLS=T, useRaw=T, refitAll=F, useSE=F, ncores=1) {
 
-
+  if (ncores > 1) {
+    # if we are parallelizing, then disable BLAS parallelization
+    options(bigstatsr.check.parallel.blas = FALSE)
+    blas_nproc <- getOption("default.nproc.blas")
+    options(default.nproc.blas = NULL)
+  }
   getT=function(x){-quantile(x[x<0], adaptive.p)}
 
   pathwaySelection=match.arg(pathwaySelection, c("complete", "fast"))
@@ -983,12 +1000,12 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
   L2k=L2*diag(k)
 
   if(is_fbm){
-    ZYt=big_cprodMat(Y, as.matrix(Z))
+    ZYt=big_cprodMat(Y, as.matrix(Z), ncores=ncores)
     ZY=Matrix::t(ZYt)
     B=solve(Matrix::t(Z)%*%Z+L2k)%*%ZY
   }
   else{
-    B=solve(Matrix::t(Z)%*%Z+L2k)%*%mat_mult(Matrix::t(Z),Y)
+    B=solve(Matrix::t(Z)%*%Z+L2k)%*%mat_mult(Matrix::t(Z),Y,ncores=ncores)
   }
   Zraw=Z
   Z2=matrix(0, nrow=nrow(Z), ncol=ncol(Z))
@@ -1037,7 +1054,7 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
 
       curfrac=(npos<-sum(apply(U,2,max)>0))/k
       #Z1=Y%*%t(B)
-      Z1=mat_mult(Y, t(B))
+      Z1=mat_mult(Y, t(B), ncores=ncores)
 
       # ii=which(Z2>0)
       # ratio=median(Z2[ii]/abs(Z1[ii]))
@@ -1048,7 +1065,7 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
 
     else{
 
-      Z=mat_mult(Y,t(B))%*%solve(tcrossprod(B)+L1k)
+      Z=mat_mult(Y,t(B),ncores=ncores)%*%solve(tcrossprod(B)+L1k)
     }
 
     if(adaptive.p>0){
@@ -1071,13 +1088,13 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
     oldB=B
 
     if(is_fbm){
-      ZYt=big_cprodMat(Y, as.matrix(Z))
+      ZYt=big_cprodMat(Y, as.matrix(Z), ncores=ncores)
       ZY=Matrix::t(ZYt)
       B=solve(Matrix::t(Z)%*%Z+L2k)%*%ZY
     }
     else{
       Z_mat <- if (inherits(Z, "matrix")) Z else as.matrix(Z)
-      B=solve(Matrix::t(Z_mat)%*%Z+L2k)%*%mat_mult(Matrix::t(Z),Y)
+      B=solve(Matrix::t(Z_mat)%*%Z+L2k)%*%mat_mult(Matrix::t(Z),Y, ncores=ncores)
     }
 
     Bdiff=sum((B-oldB)^2)/sum(B^2)
@@ -1144,6 +1161,12 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
   # rownames(out$B)=nameB(out)
   out$call=call = match.call()
   out
+
+  if (ncores > 1) {
+  # restore previous state
+  options(bigstatsr.check.parallel.blas = TRUE)
+  options(default.nproc.blas = blas_nproc)
+}
 }
 
 #' Project new data into PLIER latent space
@@ -1156,7 +1179,7 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
 #' @param newdata A gene expression matrix (genes x samples) to be projected. Must have the same genes (rows) as \code{PLIERres$Z}.
 #'        Can be a standard matrix, sparse matrix, or FBM/big.matrix.
 #' @param scale Optional numeric multiplier for the L2 regularization terms. Default is 1.
-#'
+#' @param ncores Number of cores to use for parallel computation (only used if newdata is an FBM). Default is 1.
 #' @return A matrix \code{B} of projected latent loadings (LVs x samples) for the new dataset.
 #'
 #' @details
@@ -1175,33 +1198,47 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
 #' dim(projB)
 #'
 #' @export
-projectPLIER = function(PLIERres, newdata, scale=1) {
+projectPLIER = function(PLIERres, newdata, scale=1, ncores=1) {
   stopifnot(nrow(PLIERres$Z) == nrow(newdata))
+  
+  if (ncores > 1) {
+  # if we are parallelizing, then disable BLAS parallelization
+  options(bigstatsr.check.parallel.blas = FALSE)
+  blas_nproc <- getOption("default.nproc.blas")
+  options(default.nproc.blas = NULL)
+  }
 
   # Check if newdata is a FBM/big.matrix object
   is_fbm = inherits(newdata, c("big.matrix", "FBM"))
-
+  
   # Convert Matrix package matrices to standard R matrices for compatibility
   Z_matrix = if (inherits(PLIERres$Z, "Matrix")) as.matrix(PLIERres$Z) else PLIERres$Z
-
+  
   if (is_fbm) {
     # FBM implementation - use big_cprodMat for efficient computation
     # But ensure Z is a standard matrix, not a Matrix package object
-    ZYt = big_cprodMat(newdata, Z_matrix)
-    ZY = Matrix::t(ZYt)
+    ZYt = big_cprodMat(newdata, Z_matrix, ncores=ncores)
+    ZY = t(ZYt)
   } else {
     # Standard matrix implementation - use regular matrix multiplication
-    ZY = Matrix::t(Z_matrix) %*% newdata
+    ZY = t(Z_matrix) %*% newdata
   }
-
+  
   # Calculate the regularization matrix using standard matrix operations
-  ZtZ = Matrix::t(Z_matrix) %*% Z_matrix
+  ZtZ = t(Z_matrix) %*% Z_matrix
   L2k = PLIERres$L2 * diag(ncol(Z_matrix))*scale
-
+  
   # Solve the regularized system
   B = solve(ZtZ + L2k) %*% ZY
-
+  
   return(B)
+
+  if (ncores > 1) {
+  # restore previous state
+  options(bigstatsr.check.parallel.blas = TRUE)
+  options(default.nproc.blas = blas_nproc)
+ }
+
 }
 
 ## Refactored PC estimation functions

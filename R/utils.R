@@ -623,6 +623,7 @@ preprocessPLIER2FBM <- function(fbm,
     var_cutoff  = var_cutoff,
     backingfile = filt_bk
   )
+
   fbm_filtered <- filter_res$fbm_filtered
   kept_rows    <- filter_res$kept_rows
 
@@ -781,6 +782,7 @@ cpmPLIER2 <- function(counts) {
 #'
 #' @param fbm_counts A bigstatsr::FBM of raw counts (genes x samples).
 #' @param block_size Numeric; rows per block (default 1000).
+#' @param ncores Integer; number of cores to use for parallel operations (default 1).
 #' @return Invisibly returns the modified FBM (now holding CPM values).
 #' @examples
 #' library(bigstatsr)
@@ -799,27 +801,46 @@ cpmPLIER2 <- function(counts) {
 #' # convert counts to CPM in-place
 #' cpmPLIER2FBM(fbm, block_size = 1)
 #' @export
-cpmPLIER2FBM <- function(fbm_counts, block_size = 1000) {
-  if (!inherits(fbm_counts, "FBM")) {
-    stop("`fbm_counts` must be a bigstatsr::FBM object.")
-  }
-  n_r <- nrow(fbm_counts)
+cpmPLIER2FBM <- function(fbm_counts, block_size = 1000, ncores = 1) {
+  if (!inherits(fbm_counts, "FBM")) stop("`fbm_counts` must be a bigstatsr::FBM object.")
   n_c <- ncol(fbm_counts)
-  lib_sizes <- numeric(n_c)
-  
-  # compute library sizes
-  for (rs in seq(1, n_r, by = block_size)) {
-    rows <- rs:min(rs + block_size - 1, n_r)
-    lib_sizes <- lib_sizes + colSums(fbm_counts[rows, , drop = FALSE])
+
+  if (ncores > 1) {
+    options(bigstatsr.check.parallel.blas = FALSE)
+    old_blas <- getOption("default.nproc.blas")
+    options(default.nproc.blas = NULL)
+    on.exit({
+      options(bigstatsr.check.parallel.blas = TRUE)
+      options(default.nproc.blas = old_blas)
+    }, add = TRUE)
   }
-  
-  # in-place CPM
-  for (rs in seq(1, n_r, by = block_size)) {
-    rows <- rs:min(rs + block_size - 1, n_r)
-    block <- fbm_counts[rows, , drop = FALSE]
-    block <- sweep(block, 2, lib_sizes, "/") * 1e6
-    fbm_counts[rows, ] <- block
-  }
-  
+
+  row_inds <- bigstatsr::rows_along(fbm_counts, by = block_size)
+
+  lib_sizes <- bigstatsr::big_apply(
+    fbm_counts,
+    a.FUN = function(X, ind) colSums(X[ind, , drop = FALSE]),
+    a.combine = "+",
+    ind = row_inds,
+    ncores = ncores
+  )
+
+  lib_sizes[lib_sizes == 0] <- 1
+
+  bigstatsr::big_apply(
+    fbm_counts,
+    a.FUN = function(X, ind, libs) {
+      blk <- X[ind, , drop = FALSE]
+      blk <- sweep(blk, 2, libs, "/") * 1e6
+      X[ind, ] <- blk
+      integer(0)
+    },
+    a.combine = "c",
+    ind = row_inds,
+    ncores = ncores,
+    libs = lib_sizes
+  )
+
   invisible(fbm_counts)
 }
+
