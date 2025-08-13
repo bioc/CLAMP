@@ -662,13 +662,8 @@ zscorePLIER2FBM <- function(fbm_filtered, rowStats, chunk_size = 1000, ncores = 
   message("Applying Z-score transformation")
   means <- rowStats$row_means
   sds   <- sqrt(rowStats$row_variances)
-  sds[sds == 0] <- 1
+  sds[!is.finite(sds) | sds == 0] <- 1
 
-  # Build column chunks
-  inds <- split(seq_len(ncol(fbm_filtered)),
-                ceiling(seq_len(ncol(fbm_filtered)) / chunk_size))
-
-  # Avoid BLAS oversubscription when using >1 core
   if (ncores > 1) {
     options(bigstatsr.check.parallel.blas = FALSE)
     old_blas <- getOption("default.nproc.blas")
@@ -686,18 +681,18 @@ zscorePLIER2FBM <- function(fbm_filtered, rowStats, chunk_size = 1000, ncores = 
       block <- sweep(block, 1, means, "-")
       block <- sweep(block, 1, sds,   "/")
       X[, ind] <- block
-      integer(0)  # minimal return to keep memory low
+      integer(0)
     },
-    a.combine = "c",
-    ind       = inds,
-    ncores    = ncores,
-    means     = means,
-    sds       = sds
+    a.combine  = "c",
+    ind        = bigstatsr::cols_along(fbm_filtered), 
+    block.size = chunk_size,
+    ncores     = ncores,
+    means      = means,
+    sds        = sds
   )
 
   invisible(NULL)
 }
-
 
 #' Preprocess an expression matrix for PLIER2
 #'
