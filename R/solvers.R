@@ -1160,13 +1160,14 @@ PLIERfull=function(Y, priorMat,svdres=NULL, plier.base.result=NULL,k=NULL, L1=NU
   #currently not working
   # rownames(out$B)=nameB(out)
   out$call=call = match.call()
-  out
 
   if (ncores > 1) {
   # restore previous state
   options(bigstatsr.check.parallel.blas = TRUE)
   options(default.nproc.blas = blas_nproc)
-}
+  }
+  
+  return(out)
 }
 
 #' Project new data into PLIER latent space
