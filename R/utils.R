@@ -126,9 +126,6 @@ tscale <- function(x) {
 mymessage <- function(...) {
   message(paste(...))
 }
-mymessage <- function(...) {
-  message(paste(...))
-}
 
 #' Get maximum AUC per latent variable
 #'
@@ -340,7 +337,7 @@ commonRows=function(data1, data2){
 #' Modifies the FBM in place. Uses `bigstatsr::big_apply()` to process in parallel-safe chunks.
 #' @importFrom bigstatsr big_apply rows_along FBM
 cleanFBM <- function(fbm, ncores = 1) {
-  # 1. Block‐wise scan for max and NA
+  # Block‐wise scan for max and NA
   stats <- big_apply(
     fbm,
     a.FUN = function(X, ind) {
@@ -358,33 +355,33 @@ cleanFBM <- function(fbm, ncores = 1) {
         )
       }, list(...))
     },
-    ind        = cols_along(fbm),
+    ind        = bigstatsr::cols_along(fbm),
     ncores     = ncores,
   )
 
   max_value <- stats$max
   has_na    <- stats$na
 
-  # 2. Log2 transform if necessary
+  # Log2 transform if necessary
   if (!is.na(max_value) && max_value >= 100) {
     message("Applying log2 transformation")
     big_apply(
       fbm,
       a.FUN     = function(X, ind) { X[, ind] <- log2(X[, ind] + 1); NULL },
-      ind       = cols_along(fbm),
+      ind       = bigstatsr::cols_along(fbm),
       ncores    = ncores,
     )
   } else {
     message("Already on log scale or all NA")
   }
 
-  # 3. Fill NAs if present
+  # Fill NAs if present
   if (has_na) {
     message("Filling NAs with 0")
     big_apply(
       fbm,
       a.FUN     = function(X, ind) { X[, ind][is.na(X[, ind])] <- 0; NULL },
-      ind       = cols_along(fbm),
+      ind       = bigstatsr::cols_along(fbm),
       ncores    = ncores,
     )
   } else {
@@ -400,7 +397,6 @@ cleanFBM <- function(fbm, ncores = 1) {
 #' column-wise chunking, suitable for large datasets that cannot be loaded fully into memory.
 #'
 #' @param fbm A `bigstatsr::FBM` object.
-#' @param chunk_size Number of columns to process at a time. Default is 1000.
 #' @param ncores Integer; number of cores to use for parallel operations (default 1).
 #' @return A list with two numeric vectors:
 #' \describe{
@@ -552,6 +548,7 @@ zscorePLIER2 <- function(Y_filtered, rowStats) {
 #' @param backingfile Character or NULL. Base name for the *copy* FBM and filtered FBM on disk.
 #'                    If NULL, defaults to paste0(fbm$backingfile, "_preproc") and "_filtered".
 #' @param ncores Integer; number of cores to use for parallel operations (default 1).
+#' @param block_size Number of rows to process at a time when copying data. Default is 1000.
 #' @return A list with:
 #'   \item{fbm_filtered}{The filtered FBM (writable).}
 #'   \item{rowStats}{List with row_means & row_variances for fbm_filtered.}
@@ -574,6 +571,7 @@ preprocessPLIER2FBM <- function(fbm,
                                 mean_cutoff = NULL,
                                 var_cutoff  = NULL,
                                 backingfile = NULL,
+                                block_size = 1000,
                                 ncores = 1) {
   
   n_r <- nrow(fbm)
@@ -776,30 +774,24 @@ cpmPLIER2 <- function(counts) {
 #' Compute CPM on a file-backed matrix for PLIER2 (in-place)
 #'
 #' @param fbm_counts A bigstatsr::FBM of raw counts (genes x samples).
-#' @param block_size Numeric; rows per block (default 1000).
+#' @param block_size Integer; columns per block (default 1000).
 #' @param ncores Integer; number of cores to use for parallel operations (default 1).
 #' @return Invisibly returns the modified FBM (now holding CPM values).
 #' @examples
 #' library(bigstatsr)
-#'
-#' # small 2 genes x 3 samples count matrix
-#' mat <- matrix(
-#'   c(10, 20, 30,
-#'     40, 50, 60),
-#'   nrow = 2, byrow = FALSE,
-#'   dimnames = list(c("gene1", "gene2"), paste0("sample", 1:3))
-#' )
-#'
-#' # create an FBM initialized with counts
+#' mat <- matrix(c(10,20,30, 40,50,60), nrow = 2,
+#'               dimnames = list(c("gene1","gene2"), paste0("sample", 1:3)))
 #' fbm <- FBM(nrow(mat), ncol(mat), init = mat)
-#'
-#' # convert counts to CPM in-place
 #' cpmPLIER2FBM(fbm, block_size = 1)
 #' @export
 cpmPLIER2FBM <- function(fbm_counts, block_size = 1000, ncores = 1) {
-  if (!inherits(fbm_counts, "FBM")) stop("`fbm_counts` must be a bigstatsr::FBM object.")
-  n_c <- ncol(fbm_counts)
+  if (!inherits(fbm_counts, "FBM")) {
+    stop("`fbm_counts` must be a bigstatsr::FBM object.")
+  }
+  block_size <- as.integer(block_size)
+  if (block_size <= 0) stop("`block_size` must be a positive integer.")
 
+  # Avoid BLAS oversubscription when parallelizing
   if (ncores > 1) {
     options(bigstatsr.check.parallel.blas = FALSE)
     old_blas <- getOption("default.nproc.blas")
@@ -810,30 +802,31 @@ cpmPLIER2FBM <- function(fbm_counts, block_size = 1000, ncores = 1) {
     }, add = TRUE)
   }
 
-  row_inds <- bigstatsr::rows_along(fbm_counts, by = block_size)
-
+  # Library sizes (sum per column), processed in column chunks
   lib_sizes <- bigstatsr::big_apply(
     fbm_counts,
-    a.FUN = function(X, ind) colSums(X[ind, , drop = FALSE]),
-    a.combine = "+",
-    ind = row_inds,
-    ncores = ncores
+    a.FUN      = function(X, ind) colSums(X[, ind, drop = FALSE]),
+    a.combine  = "c",
+    ind        = bigstatsr::cols_along(fbm_counts),
+    block.size = block_size,
+    ncores     = ncores
   )
-
   lib_sizes[lib_sizes == 0] <- 1
 
+  # Divide each column by its library size and scale to CPM, in-place
   bigstatsr::big_apply(
     fbm_counts,
-    a.FUN = function(X, ind, libs) {
-      blk <- X[ind, , drop = FALSE]
-      blk <- sweep(blk, 2, libs, "/") * 1e6
-      X[ind, ] <- blk
+    a.FUN      = function(X, ind, libs) {
+      blk <- X[, ind, drop = FALSE]
+      blk <- sweep(blk, 2, libs[ind], "/") * 1e6
+      X[, ind] <- blk
       integer(0)
     },
-    a.combine = "c",
-    ind = row_inds,
-    ncores = ncores,
-    libs = lib_sizes
+    a.combine  = "c",
+    ind        = bigstatsr::cols_along(fbm_counts),
+    block.size = block_size,
+    ncores     = ncores,
+    libs       = lib_sizes
   )
 
   invisible(fbm_counts)

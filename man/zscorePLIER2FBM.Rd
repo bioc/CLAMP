@@ -4,7 +4,7 @@
 \alias{zscorePLIER2FBM}
 \title{Z-score a filtered FBM in-place}
 \usage{
-zscorePLIER2FBM(fbm_filtered, rowStats, chunk_size = 1000)
+zscorePLIER2FBM(fbm_filtered, rowStats, chunk_size = 1000, ncores = 1)
 }
 \arguments{
 \item{fbm_filtered}{A bigstatsr::FBM produced by preprocessPLIER2FBM().}
@@ -12,6 +12,8 @@ zscorePLIER2FBM(fbm_filtered, rowStats, chunk_size = 1000)
 \item{rowStats}{A list with row_means and row_variances from that FBM.}
 
 \item{chunk_size}{Columns per block (default 1000).}
+
+\item{ncores}{Integer; number of cores to use for parallel operations (default 1).}
 }
 \description{
 Standardizes each row of an FBM using provided row means and variances.

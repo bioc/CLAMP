@@ -11,7 +11,7 @@
 #' @importFrom glmnet glmnet cv.glmnet
 #' @importFrom rsvd rsvd
 #' @importFrom irlba irlba
-#' 
+#'
 NULL
 
 # silence NSE notes from ggplot/data.frame column names

@@ -124,19 +124,14 @@ rotateSVD=function(svdres){
 #' @param top Number of top entries to keep in each column.
 #' @param keepVals If \code{TRUE}, retains original values above the cutoff; otherwise, sets them to 1.
 #' @return A modified matrix with only top entries retained per column.
-binarizeTop=function(Z, top, keepVals=T){
-  for(i in 1:ncol(Z)){
-    cutoff=sort(Z[,i],T)[top+1]
-
-
-    if(cutoff==0){
-
-      cutoff=min(Z[Z[,i]>0,i])
+binarizeTop <- function(Z, top, keepVals = TRUE) {
+  for (i in seq_len(ncol(Z))) {
+    cutoff <- sort(Z[, i], decreasing = TRUE)[top + 1]
+    if (cutoff == 0) {
+      cutoff <- min(Z[Z[, i] > 0, i])
     }
-    Z[Z[,i]<cutoff,i]=0
-    if(!keepVals){
-      Z[Z[,i]>0,i]=1
-    }
+    Z[Z[, i] < cutoff, i] <- 0
+    if (!keepVals) Z[Z[, i] > 0, i] <- 1
   }
   Z
 }
@@ -171,9 +166,9 @@ binarizeTop=function(Z, top, keepVals=T){
 #'
 #' @importFrom glmnet glmnet cv.glmnet
 #' @importFrom Matrix crossprod
-solveU=function(Z,  Chat=NULL, priorMat, penalty.factor,pathwaySelection="fast", alpha=0.9,
-                maxPath=10,  nfolds=5,  useSE=F, top=NULL, binary=F,
-                nlambda=20, scale=T, refit=T, Uprev=NULL,...){
+solveU <- function(Z, Chat = NULL, priorMat, penalty.factor, pathwaySelection = "fast",
+                   alpha = 0.9, maxPath = 10, nfolds = 5, useSE = FALSE, top = NULL,
+                   binary = FALSE, nlambda = 20, scale = TRUE, refit = TRUE, Uprev = NULL, ...){
 
   if(nrow(Z)!=nrow(priorMat)){
     cm=commonRows(Z, priorMat)
@@ -375,7 +370,7 @@ getChat <- function(priorMat, scale = TRUE) {
 #' @export
 getMatchedPathwayMat <- function(pathMat, new.genes, min.genes = 10) {
   cm <- intersect(rownames(pathMat), new.genes)
-  mymessage("there are ", length(cm), " genes in the intersection between data and prior")
+  mymessage("There are ", length(cm), " genes in the intersection between data and prior")
 
   matchPathMat <- Matrix::sparseMatrix(
     i = match(cm, new.genes),
@@ -484,18 +479,16 @@ getMatchedPathwayMatOld <- function(pathMat, new.genes, min.genes = 10) {
 AUC <- function(labels, values) {
   pos <- labels > 0
   neg <- !pos
-  posn <- sum(pos)
-  negn <- sum(neg)
+  posn <- sum(pos); negn <- sum(neg)
 
   if (posn > 0 && negn > 0) {
-    res <- suppressWarnings(wilcox.test(values[pos], values[neg], alternative = "greater"))
-    auc <- unname(res$statistic) / (posn * negn)
+    res <- stats::wilcox.test(values[pos], values[neg],
+                              alternative = "greater", exact = FALSE)
+    auc  <- unname(res$statistic) / (posn * negn)
     pval <- res$p.value
   } else {
-    auc <- 0.5
-    pval <- NA
+    auc <- 0.5; pval <- NA
   }
-
   list(auc = auc, pval = pval)
 }
 
@@ -520,10 +513,9 @@ crossVal<-function(plierRes,priorMat, priorMatcv){
   out=matrix(ncol=4, nrow=0)
   ii=which(Matrix::colSums(plierRes$U)>0)
 
-  # Uauc <- Matrix::sparseMatrix(i = integer(0), j = integer(0), dims = dim(plierRes$U))
-  #  Up <- Matrix::sparseMatrix(i = integer(0), j = integer(0), dims = dim(plierRes$U))
-  Uauc=Matrix(0, nrow = nrow(plierRes$U), ncol=ncol(plierRes$U), sparse=T)
-  Up=Matrix(0,nrow = nrow(plierRes$U), ncol=ncol(plierRes$U), sparse=T)
+  Uauc <- Matrix::Matrix(0, nrow = nrow(plierRes$U), ncol = ncol(plierRes$U), sparse = TRUE)
+  Up   <- Matrix::Matrix(0, nrow = nrow(plierRes$U), ncol = ncol(plierRes$U), sparse = TRUE)
+
   for ( i in ii){ #for each column in U
 
     iipath=which(plierRes$U[,i]>0) #get the pathways
@@ -669,8 +661,8 @@ PLIERbase=function(Y, k,svdres=NULL,  L1=NULL, L2=NULL,
   }
   L2k=L2*diag(k)
   #    L1=svdres$d[k]/2*scale
-  print(paste0("L1 is set to ",L1))
-  print(paste0("L2 is set to ",L2))
+  message("L1 is set to ", L1)
+  message("L2 is set to ", L2)
 
   if(is.null(B)){
     #initialize B with svd

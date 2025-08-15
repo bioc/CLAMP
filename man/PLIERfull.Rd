@@ -33,7 +33,8 @@ PLIERfull(
   useNNLS = T,
   useRaw = T,
   refitAll = F,
-  useSE = F
+  useSE = F,
+  ncores = 1
 )
 }
 \arguments{
@@ -96,6 +97,8 @@ small positive values, assuming they reflect noise. Default is 0.05.}
 \item{refitAll}{If \code{TRUE}, refits all U columns every update. Default is \code{FALSE}.}
 
 \item{useSE}{Logical; passed to the internal \code{solveU()} call. If \code{TRUE}, enables standard-error–aware selection when fitting U (pathway coefficients). Default is \code{FALSE}.}
+
+\item{ncores}{Number of cores to use for parallel computation (only used if Y is an FBM). Default is 1.}
 }
 \value{
 A list with the following components:

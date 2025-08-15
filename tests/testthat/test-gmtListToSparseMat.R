@@ -6,7 +6,7 @@ test_that("gmtListToSparseMat builds a sparse matrix with correct dims and value
   mat <- gmtListToSparseMat(nested)
 
   expect_s4_class(mat, "dgCMatrix")
-  expect_equal(ncol(mat), 3)          
+  expect_equal(ncol(mat), 3)
   expect_equal(sort(rownames(mat)), sort(unique(unlist(unlist(nested)))))
 
   expect_equal(mat["a", "A"], 1)

@@ -4,7 +4,7 @@
 \alias{projectPLIER}
 \title{Project new data into PLIER latent space}
 \usage{
-projectPLIER(PLIERres, newdata, scale = 1)
+projectPLIER(PLIERres, newdata, scale = 1, ncores = 1)
 }
 \arguments{
 \item{PLIERres}{A result object from \code{PLIERfull()} or \code{PLIERbase()}, containing at least \code{Z} and \code{L2}.}
@@ -13,6 +13,8 @@ projectPLIER(PLIERres, newdata, scale = 1)
 Can be a standard matrix, sparse matrix, or FBM/big.matrix.}
 
 \item{scale}{Optional numeric multiplier for the L2 regularization terms. Default is 1.}
+
+\item{ncores}{Number of cores to use for parallel computation (only used if newdata is an FBM). Default is 1.}
 }
 \value{
 A matrix \code{B} of projected latent loadings (LVs x samples) for the new dataset.

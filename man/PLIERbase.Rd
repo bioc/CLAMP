@@ -20,7 +20,8 @@ PLIERbase(
   pos.adj = 3,
   adaptive.p = 0.05,
   adaptive.iter = 20,
-  cutoff = 0
+  cutoff = 0,
+  ncores = 1
 )
 }
 \arguments{
@@ -55,6 +56,8 @@ PLIERbase(
 \item{adaptive.iter}{Number of iterations before adaptive sparsity is applied. Default is 20.}
 
 \item{cutoff}{Scalar threshold to zero Z values when \code{Zpos = TRUE} and adaptive thresholding is not used. Default is 0.}
+
+\item{ncores}{Number of cores to use for parallel computation (only used if Y is an FBM). Default is 1.}
 }
 \value{
 A list with components:

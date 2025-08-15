@@ -8,7 +8,9 @@ preprocessPLIER2FBM(
   fbm,
   mean_cutoff = NULL,
   var_cutoff = NULL,
-  backingfile = NULL
+  backingfile = NULL,
+  block_size = 1000,
+  ncores = 1
 )
 }
 \arguments{
@@ -20,6 +22,10 @@ preprocessPLIER2FBM(
 
 \item{backingfile}{Character or NULL. Base name for the \emph{copy} FBM and filtered FBM on disk.
 If NULL, defaults to paste0(fbm$backingfile, "_preproc") and "_filtered".}
+
+\item{block_size}{Number of rows to process at a time when copying data. Default is 1000.}
+
+\item{ncores}{Integer; number of cores to use for parallel operations (default 1).}
 }
 \value{
 A list with:

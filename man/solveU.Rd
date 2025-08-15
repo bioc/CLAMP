@@ -13,12 +13,12 @@ solveU(
   alpha = 0.9,
   maxPath = 10,
   nfolds = 5,
-  useSE = F,
+  useSE = FALSE,
   top = NULL,
-  binary = F,
+  binary = FALSE,
   nlambda = 20,
-  scale = T,
-  refit = T,
+  scale = TRUE,
+  refit = TRUE,
   Uprev = NULL,
   ...
 )

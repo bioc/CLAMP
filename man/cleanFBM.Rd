@@ -4,10 +4,12 @@
 \alias{cleanFBM}
 \title{Clean a Filebacked Big Matrix (FBM) by log-transforming and handling NAs}
 \usage{
-cleanFBM(fbm)
+cleanFBM(fbm, ncores = 1)
 }
 \arguments{
 \item{fbm}{A \code{bigmemory::FBM} or \code{bigstatsr::FBM} object.}
+
+\item{ncores}{Integer; number of cores to use for parallel operations (default 1).}
 }
 \value{
 A list with:

@@ -1,37 +1,56 @@
 Package: PLIER2
 Type: Package
 Title: Pathway-Level Information ExtractoR Version 2 for Gene Expression Analysis
-Version: 0.0.0.9000
-Authors@R: c(person("Marc", "Subirana-Granes", email = "mb2subi@gmail.com", role = c("aut","cre")), person("Maria", "Chikina", email = "mchikina@gmail.com", role = "aut"))
-Description: PLIER2 integrates pathway priors into matrix factorization for gene expression, with support for big matrices, adaptive sparsity, cross-validation, and projection.
+Version: 0.99.0
+Authors@R: 
+    c(
+      person("Marc", "Subirana-Granes", role = c("aut","cre"),
+             email = "mb2subi@gmail.com",
+             comment = c(ORCID = "0000-0003-3934-839X")),
+      person("Maria", "Chikina", role = "aut",
+             email = "mchikina@gmail.com")
+    )
+Description: PLIER2 performs prior-informed latent variable decomposition of
+    high-dimensional transcriptomic data. It integrates curated gene sets to
+    learn biologically interpretable latent variables, supports file-backed
+    matrices for large datasets, and provides tools for preprocessing,
+    normalization, projection, and evaluation of latent structures.
 License: GPL-3
-Encoding: UTF-8
-LazyData: true
-Depends: R (>= 3.5)
+URL: https://mchikina.github.io/PLIER2/, https://github.com/mchikina/PLIER2
+BugReports: https://github.com/mchikina/PLIER2/issues
+Depends:
+    R (>= 4.3.0)
 Imports:
     bigstatsr,
+    Matrix,
+    rlang,
+    rsvd,
+    irlba,
+    glmnet,
+    stats,
     dplyr,
     ggplot2,
     ggrepel,
-    glmnet,
-    irlba,
-    Matrix,
-    rlang,
-    rsvd
+    utils
 Suggests:
     AnnotationDbi,
+    BiocStyle,
     DT,
     DiagrammeR,
     data.table,
     hdf5r,
     here,
-    org.Hs.eg.db,
     knitr,
+    org.Hs.eg.db,
+    rappdirs,
     rmarkdown,
-    testthat,
-    rappdirs
+    testthat (>= 3.0.0)
 VignetteBuilder: knitr
-URL: https://mchikina.github.io/PLIER2/, https://github.com/mchikina/PLIER2
-BugReports: https://github.com/mchikina/PLIER2/issues
+Encoding: UTF-8
+LazyData: false
+biocViews: Software, GeneExpression, RNASeq, Transcriptomics,
+    DimensionReduction, MachineLearning, Visualization,
+    Normalization, Preprocessing, GenePrediction
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
+Config/testthat/edition: 3
