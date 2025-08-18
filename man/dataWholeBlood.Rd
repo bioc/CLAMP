@@ -7,9 +7,14 @@
 \format{
 A numeric matrix with G genes and N samples.
 Row names are gene symbols; column names are sample IDs.
+
+A numeric matrix with genes as rows and samples as columns.
 }
 \usage{
 data(dataWholeBlood)
+}
+\value{
+A matrix of expression values.
 }
 \description{
 A numeric matrix of whole-blood gene expression

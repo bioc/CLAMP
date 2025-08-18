@@ -15,6 +15,9 @@ zscorePLIER2FBM(fbm_filtered, rowStats, chunk_size = 1000, ncores = 1)
 
 \item{ncores}{Integer; number of cores to use for parallel operations (default 1).}
 }
+\value{
+A normalized FBM with z-scored rows.
+}
 \description{
 Standardizes each row of an FBM using provided row means and variances.
 }

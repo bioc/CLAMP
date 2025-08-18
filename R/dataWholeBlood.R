@@ -13,4 +13,6 @@
 #' @examples
 #' data(dataWholeBlood)
 #' dim(dataWholeBlood)
+#' @format A numeric matrix with genes as rows and samples as columns.
+#' @return A matrix of expression values.
 "dataWholeBlood"

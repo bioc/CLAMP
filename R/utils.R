@@ -1,6 +1,3 @@
-
-library(dplyr)
-
 #' Row-wise scaling (mean 0, sd 1)
 #'
 #' Standardize each row of a numeric matrix to have mean 0 and standard deviation 1.
@@ -10,7 +7,7 @@ library(dplyr)
 tscale <- function(x) {
   row_means <- rowMeans(x)
   row_sds <- sqrt(rowMeans((x - row_means)^2))
-  row_sds[row_sds == 0] <- 1  # avoid division by zero
+  row_sds[row_sds == 0] <- 1 # avoid division by zero
   sweep(sweep(x, 1, row_means), 1, row_sds, "/")
 }
 
@@ -71,8 +68,8 @@ tscale <- function(x) {
 #   if (method %in% c("s", "p")) {
 #     mat1 <- cor(t(B1), target, method = method)
 #     mat2 <- cor(t(B2), target, method = method)
-#     cor1 <- apply(mat1, 2, max, na.rm=T)
-#     cor2 <- apply(mat2, 2, max, na.rm=T)
+#     cor1 <- apply(mat1, 2, max, na.rm=TRUE)
+#     cor2 <- apply(mat2, 2, max, na.rm=TRUE)
 #     idx1 <- apply(mat1, 2, which.max)
 #     idx2 <- apply(mat2, 2, which.max)
 #   } else if (method == "a") {
@@ -123,8 +120,9 @@ tscale <- function(x) {
 #'
 #' Wrapper around `message()` that pastes arguments together into a single string.
 #' @param ... Character strings to concatenate and print.
+#' @return Invisibly returns NULL. Called for side effects (messages).
 mymessage <- function(...) {
-  message(paste(...))
+  message(...)
 }
 
 #' Get maximum AUC per latent variable
@@ -136,16 +134,15 @@ mymessage <- function(...) {
 #' @param verbose Logical; if `TRUE`, prints counts of LVs exceeding AUC thresholds. Default is `FALSE`.
 #'
 #' @return A data frame with columns LV index and max_AUC.
-getMaxAUC <- function(summary, verbose=F){
-
+getMaxAUC <- function(summary, verbose = FALSE) {
   max_auc_per_lv <- summary %>%
     group_by(.data$`LV index`) %>%
     summarize(max_AUC = max(.data$AUC, na.rm = TRUE)) %>%
     ungroup()
 
-  if(verbose){
-    message(paste("There are", sum(max_auc_per_lv$max_AUC>0.70), " LVs with AUC>0.70"))
-    message(paste("There are", sum(max_auc_per_lv$max_AUC>0.90), " LVs with AUC>0.90"))
+  if (verbose) {
+    message("There are ", sum(max_auc_per_lv$max_AUC > 0.70), " LVs with AUC>0.70")
+    message("There are ", sum(max_auc_per_lv$max_AUC > 0.90), " LVs with AUC>0.90")
   }
   max_auc_per_lv
 }
@@ -158,9 +155,11 @@ getMaxAUC <- function(summary, verbose=F){
 #' @param summary A data frame with `LV index` and `AUC` columns.
 #'
 #' @return A named numeric vector with counts for thresholds 0.7, 0.8, and 0.9.
-getAUCstats=function(summary){
-  out=getMaxAUC(summary)
-  unlist(lapply(c(0.7,0.8, 0.9), function(x){sum(out$max_AUC>x)}))
+getAUCstats <- function(summary) {
+  out <- getMaxAUC(summary)
+  unlist(lapply(c(0.7, 0.8, 0.9), function(x) {
+    sum(out$max_AUC > x)
+  }))
 }
 
 #' Greedy maximum correspondence from correlation matrix
@@ -169,6 +168,7 @@ getAUCstats=function(summary){
 #' that maximizes the total correlation score, using a greedy algorithm.
 #'
 #' @param cor_mat A square numeric matrix of pairwise correlations (rows = items, cols = items).
+#' @return A vector of assignments (integer indices).
 max_correspondence_greedy <- function(cor_mat) {
   n <- nrow(cor_mat)
   used_rows <- rep(FALSE, n)
@@ -189,7 +189,7 @@ max_correspondence_greedy <- function(cor_mat) {
     }
   }
 
-  list(permutation = assignment, sum = sum(cor_mat[cbind(1:n, assignment)]))
+  list(permutation = assignment, sum = sum(cor_mat[cbind(seq_len(n), assignment)]))
 }
 
 #' Download and read a GMT file from a URL
@@ -213,22 +213,22 @@ max_correspondence_greedy <- function(cor_mat) {
 #' head(gmt_list[[1]])
 #' @export
 getGMT <- function(url, name = NULL, cache_dir = NULL, redownload = FALSE) {
-if (is.null(name)) {
-  name <- sub(".*[=]", "", url)
-  message("Auto-detected name: ", name)
-}
-if (is.null(cache_dir)) {
-  cache_dir <- system.file("extdata", package = "PLIER2")
-}
-cache_file <- file.path(cache_dir, paste0(name, ".gmt"))
-if (!file.exists(cache_file) || redownload) {
-  message("Downloading ", name, " from Enrichr...")
-  if (!dir.exists(cache_dir)) dir.create(cache_dir, recursive = TRUE)
-  download.file(url, cache_file)
-} else {
-  message("Using cached file for ", name)
-}
-read_gmt(cache_file)
+  if (is.null(name)) {
+    name <- sub(".*[=]", "", url)
+    message("Auto-detected name: ", name)
+  }
+  if (is.null(cache_dir)) {
+    cache_dir <- system.file("extdata", package = "PLIER2")
+  }
+  cache_file <- file.path(cache_dir, paste0(name, ".gmt"))
+  if (!file.exists(cache_file) || redownload) {
+    message("Downloading ", name, " from Enrichr...")
+    if (!dir.exists(cache_dir)) dir.create(cache_dir, recursive = TRUE)
+    download.file(url, cache_file)
+  } else {
+    message("Using cached file for ", name)
+  }
+  read_gmt(cache_file)
 }
 
 #' Read a GMT file into a list
@@ -239,14 +239,14 @@ read_gmt(cache_file)
 #' @param filename A character string giving the path to a .gmt file.
 #'
 #' @return A named list where each element is a character vector of gene names.
-read_gmt=function (filename) {
-  gmt = list()
-  lines = readLines(filename)
+read_gmt <- function(filename) {
+  gmt <- list()
+  lines <- readLines(filename)
   for (line in lines) {
-    line = gsub("\"", "", trimws(line))
-    sp = unlist(strsplit(line, "\t"))
-    sp[3:length(sp)] = gsub(",.*$", "", sp[3:length(sp)])
-    gmt[[sp[1]]] = sort(unique(sp[3:length(sp)]))
+    line <- gsub("\"", "", trimws(line))
+    sp <- unlist(strsplit(line, "\t"))
+    sp[3:length(sp)] <- gsub(",.*$", "", sp[3:length(sp)])
+    gmt[[sp[1]]] <- sort(unique(sp[3:length(sp)]))
   }
   return(gmt)
 }
@@ -273,14 +273,12 @@ read_gmt=function (filename) {
 #' nestedList <- list(gmt1 = gmt1, gmt2 = gmt2)
 #' # convert to sparse matrix
 #' sparseMat <- gmtListToSparseMat(nestedList)
-#' @importFrom Matrix sparseMatrix
 #' @export
-gmtListToSparseMat=function(gmtList){
-
-  allnames=unlist(lapply(gmtList, names))
-  #there are usually no duplicates
-  stopifnot(all(table(allnames)==1))
-  allGenes=unique(unlist(lapply(gmtList, unlist)))
+gmtListToSparseMat <- function(gmtList) {
+  allnames <- unlist(lapply(gmtList, names))
+  # there are usually no duplicates
+  stopifnot(all(table(allnames) == 1))
+  allGenes <- unique(unlist(lapply(gmtList, unlist)))
 
   row_indices <- integer(0)
   col_indices <- integer(0)
@@ -300,10 +298,12 @@ gmtListToSparseMat=function(gmtList){
 
   # Use sparseMatrix to create the matrix in one go
 
-  pathMat=sparseMatrix(i = row_indices, j = col_indices, x = values,
-                       dims = c(length(allGenes), length(allnames)))
-  rownames(pathMat) = allGenes
-  colnames(pathMat) = allnames
+  pathMat <- sparseMatrix(
+    i = row_indices, j = col_indices, x = values,
+    dims = c(length(allGenes), length(allnames))
+  )
+  rownames(pathMat) <- allGenes
+  colnames(pathMat) <- allnames
   pathMat
 }
 
@@ -315,7 +315,7 @@ gmtListToSparseMat=function(gmtList){
 #' @param data2 A matrix, data frame, or similar object with row names.
 #'
 #' @return A character vector of row names common to both inputs.
-commonRows=function(data1, data2){
+commonRows <- function(data1, data2) {
   intersect(rownames(data1), rownames(data2))
 }
 
@@ -351,25 +351,28 @@ cleanFBM <- function(fbm, ncores = 1) {
       Reduce(function(a, b) {
         list(
           max = max(a$max, b$max, na.rm = TRUE),
-          na  = a$na  || b$na
+          na  = a$na || b$na
         )
       }, list(...))
     },
-    ind        = bigstatsr::cols_along(fbm),
-    ncores     = ncores,
+    ind = bigstatsr::cols_along(fbm),
+    ncores = ncores,
   )
 
   max_value <- stats$max
-  has_na    <- stats$na
+  has_na <- stats$na
 
   # Log2 transform if necessary
   if (!is.na(max_value) && max_value >= 100) {
     message("Applying log2 transformation")
     big_apply(
       fbm,
-      a.FUN     = function(X, ind) { X[, ind] <- log2(X[, ind] + 1); NULL },
-      ind       = bigstatsr::cols_along(fbm),
-      ncores    = ncores,
+      a.FUN = function(X, ind) {
+        X[, ind] <- log2(X[, ind] + 1)
+        NULL
+      },
+      ind = bigstatsr::cols_along(fbm),
+      ncores = ncores,
     )
   } else {
     message("Already on log scale or all NA")
@@ -380,9 +383,12 @@ cleanFBM <- function(fbm, ncores = 1) {
     message("Filling NAs with 0")
     big_apply(
       fbm,
-      a.FUN     = function(X, ind) { X[, ind][is.na(X[, ind])] <- 0; NULL },
-      ind       = bigstatsr::cols_along(fbm),
-      ncores    = ncores,
+      a.FUN = function(X, ind) {
+        X[, ind][is.na(X[, ind])] <- 0
+        NULL
+      },
+      ind = bigstatsr::cols_along(fbm),
+      ncores = ncores,
     )
   } else {
     message("No NA values found")
@@ -423,7 +429,7 @@ computeRowStatsFBM <- function(fbm, ncores = 1) {
 
   n_cols <- ncol(fbm)
   # Final means and variances
-  row_means     <- row_sums / n_cols
+  row_means <- row_sums / n_cols
   row_variances <- (row_sums_sq / n_cols) - (row_means^2)
 
   list(row_means = row_means, row_variances = row_variances)
@@ -453,7 +459,7 @@ filterFBM <- function(fbm, rowStats, mean_cutoff = NULL, var_cutoff = NULL, back
   row_variances <- rowStats$row_variances
 
   # Determine rows to keep based on cutoffs
-  keep_rows <- rep(TRUE, length(row_means))  # Default: keep all rows
+  keep_rows <- rep(TRUE, length(row_means)) # Default: keep all rows
 
   if (!is.null(mean_cutoff)) {
     keep_rows <- keep_rows & (row_means >= mean_cutoff)
@@ -488,15 +494,18 @@ filterFBM <- function(fbm, rowStats, mean_cutoff = NULL, var_cutoff = NULL, back
 #' @return Numeric matrix of the same dimensions as Y_filtered, with each row centered and scaled.
 #' @examples
 #' # simple 2 genes x 3 samples matrix
-#' Y <- matrix(c(
-#'   2, 4, 6,    # gene1 counts
-#'   8,10,12     # gene2 counts
-#' ), nrow = 2, byrow = TRUE,
-#' dimnames = list(c("gene1","gene2"), paste0("sample",1:3)))
+#' Y <- matrix(
+#'   c(
+#'     2, 4, 6, # gene1 counts
+#'     8, 10, 12 # gene2 counts
+#'   ),
+#'   nrow = 2, byrow = TRUE,
+#'   dimnames = list(c("gene1", "gene2"), paste0("sample", seq_len(3)))
+#' )
 #'
 #' # compute per‐gene mean and variance
 #' rowStats <- data.frame(
-#'   mean     = rowMeans(Y),
+#'   mean = rowMeans(Y),
 #'   variance = apply(Y, 1, var),
 #'   row.names = rownames(Y)
 #' )
@@ -510,7 +519,7 @@ zscorePLIER2 <- function(Y_filtered, rowStats) {
     stop("`Y_filtered` must be a numeric matrix (genes x samples).")
   }
   if (!is.data.frame(rowStats) ||
-      !all(c("mean", "variance") %in% colnames(rowStats))) {
+    !all(c("mean", "variance") %in% colnames(rowStats))) {
     stop("`rowStats` must be a data.frame with columns 'mean' and 'variance'.")
   }
   # Align rowStats to Y_filtered
@@ -519,7 +528,7 @@ zscorePLIER2 <- function(Y_filtered, rowStats) {
   }
   rowStats <- rowStats[rownames(Y_filtered), , drop = FALSE]
   # Ensure numeric
-  mu  <- as.numeric(rowStats$mean)
+  mu <- as.numeric(rowStats$mean)
   var <- as.numeric(rowStats$variance)
   if (any(is.na(mu)) || any(is.na(var))) {
     stop("Missing values detected in 'mean' or 'variance'.")
@@ -528,11 +537,11 @@ zscorePLIER2 <- function(Y_filtered, rowStats) {
     stop("All variances must be positive; zero or negative found.")
   }
   # Compute standard deviation
-  sd  <- sqrt(var)
+  sd <- sqrt(var)
   # Center and scale
   # subtract mu from each row, then divide by sd
-  Y_centered <- sweep(Y_filtered, 1L, mu,  "-")
-  Y_scaled   <- sweep(Y_centered, 1L, sd,  "/")
+  Y_centered <- sweep(Y_filtered, 1L, mu, "-")
+  Y_scaled <- sweep(Y_centered, 1L, sd, "/")
   # Return
   return(Y_scaled)
 }
@@ -556,12 +565,15 @@ zscorePLIER2 <- function(Y_filtered, rowStats) {
 #' @examples
 #' library(bigstatsr)
 #' # create a toy matrix and back it with an FBM
-#' mat <- matrix(c(
-#'   1,   2,   3,    # geneA
-#'   10, 20,  30,    # geneB
-#'   100,200,300     # geneC
-#' ), nrow = 3, byrow = TRUE,
-#' dimnames = list(c("geneA","geneB","geneC"), paste0("s", 1:3)))
+#' mat <- matrix(
+#'   c(
+#'     1, 2, 3, # geneA
+#'     10, 20, 30, # geneB
+#'     100, 200, 300 # geneC
+#'   ),
+#'   nrow = 3, byrow = TRUE,
+#'   dimnames = list(c("geneA", "geneB", "geneC"), paste0("s", seq_len(3)))
+#' )
 #' fbm <- FBM(nrow(mat), ncol(mat), init = mat)
 #'
 #' # preprocess without filtering (all genes kept)
@@ -569,11 +581,10 @@ zscorePLIER2 <- function(Y_filtered, rowStats) {
 #' @export
 preprocessPLIER2FBM <- function(fbm,
                                 mean_cutoff = NULL,
-                                var_cutoff  = NULL,
+                                var_cutoff = NULL,
                                 backingfile = NULL,
                                 block_size = 1000,
                                 ncores = 1) {
-  
   n_r <- nrow(fbm)
   n_c <- ncol(fbm)
 
@@ -611,7 +622,7 @@ preprocessPLIER2FBM <- function(fbm,
     options(bigstatsr.check.parallel.blas = TRUE)
     options(default.nproc.blas = blas_nproc)
   }
-  
+
   # Filter rows, writing to a new filtered FBM
   filt_bk <- paste0(base_bk, "_filtered")
   filter_res <- filterFBM(
@@ -623,7 +634,7 @@ preprocessPLIER2FBM <- function(fbm,
   )
 
   fbm_filtered <- filter_res$fbm_filtered
-  kept_rows    <- filter_res$kept_rows
+  kept_rows <- filter_res$kept_rows
 
   # Subset stats to kept rows
   stats_filt <- list(
@@ -648,28 +659,34 @@ preprocessPLIER2FBM <- function(fbm,
 #' @param ncores Integer; number of cores to use for parallel operations (default 1).
 #' @examples
 #' library(bigstatsr)
-#' fbm <- FBM(nrow = 2, ncol = 4,
-#'            init = matrix(1:8, nrow = 2))
+#' fbm <- FBM(
+#'   nrow = 2, ncol = 4,
+#'   init = matrix(seq_len(8), nrow = 2)
+#' )
 #' stats <- list(
 #'   row_means     = rowMeans(fbm[]),
 #'   row_variances = apply(fbm[], 1, var)
 #' )
 #' zscorePLIER2FBM(fbm, stats, chunk_size = 2)
+#' @return A normalized FBM with z-scored rows.
 #' @export
 zscorePLIER2FBM <- function(fbm_filtered, rowStats, chunk_size = 1000, ncores = 1) {
   message("Applying Z-score transformation")
   means <- rowStats$row_means
-  sds   <- sqrt(rowStats$row_variances)
+  sds <- sqrt(rowStats$row_variances)
   sds[!is.finite(sds) | sds == 0] <- 1
 
   if (ncores > 1) {
     options(bigstatsr.check.parallel.blas = FALSE)
     old_blas <- getOption("default.nproc.blas")
     options(default.nproc.blas = NULL)
-    on.exit({
-      options(bigstatsr.check.parallel.blas = TRUE)
-      options(default.nproc.blas = old_blas)
-    }, add = TRUE)
+    on.exit(
+      {
+        options(bigstatsr.check.parallel.blas = TRUE)
+        options(default.nproc.blas = old_blas)
+      },
+      add = TRUE
+    )
   }
 
   bigstatsr::big_apply(
@@ -677,16 +694,16 @@ zscorePLIER2FBM <- function(fbm_filtered, rowStats, chunk_size = 1000, ncores = 
     a.FUN = function(X, ind, means, sds) {
       block <- X[, ind, drop = FALSE]
       block <- sweep(block, 1, means, "-")
-      block <- sweep(block, 1, sds,   "/")
+      block <- sweep(block, 1, sds, "/")
       X[, ind] <- block
       integer(0)
     },
-    a.combine  = "c",
-    ind        = bigstatsr::cols_along(fbm_filtered), 
+    a.combine = "c",
+    ind = bigstatsr::cols_along(fbm_filtered),
     block.size = chunk_size,
-    ncores     = ncores,
-    means      = means,
-    sds        = sds
+    ncores = ncores,
+    means = means,
+    sds = sds
   )
 
   invisible(NULL)
@@ -709,12 +726,14 @@ zscorePLIER2FBM <- function(fbm_filtered, rowStats, chunk_size = 1000, ncores = 
 #' @examples
 #' # construct a small example matrix
 #' mat <- matrix(
-#'   c(1, 5, 10,
+#'   c(
+#'     1, 5, 10,
 #'     2, 6, 11,
 #'     3, 7, 12,
-#'     4, 8, 13),
+#'     4, 8, 13
+#'   ),
 #'   nrow = 4, byrow = FALSE,
-#'   dimnames = list(paste0("gene", 1:4), paste0("sample", 1:3))
+#'   dimnames = list(paste0("gene", seq_len(4)), paste0("sample", seq_len(3)))
 #' )
 #'
 #' # keep genes with mean >= 6 and variance >= 2
@@ -726,10 +745,10 @@ preprocessPLIER2 <- function(Y, mean_cutoff = 0, var_cutoff = 0) {
   }
   # Compute per‐gene statistics
   row_mean <- rowMeans(Y, na.rm = TRUE)
-  row_var  <- apply(Y, 1, stats::var,  na.rm = TRUE)
+  row_var <- apply(Y, 1, stats::var, na.rm = TRUE)
 
   rowStats <- data.frame(
-    mean     = row_mean,
+    mean = row_mean,
     variance = row_var,
     stringsAsFactors = FALSE
   )
@@ -742,7 +761,7 @@ preprocessPLIER2 <- function(Y, mean_cutoff = 0, var_cutoff = 0) {
   }
 
   # Subset matrix and stats
-  Y_filtered       <- Y[keep, , drop = FALSE]
+  Y_filtered <- Y[keep, , drop = FALSE]
   rowStats_filtered <- rowStats[keep, , drop = FALSE]
 
   return(list(
@@ -757,7 +776,7 @@ preprocessPLIER2 <- function(Y, mean_cutoff = 0, var_cutoff = 0) {
 #' @param counts A numeric matrix or data.frame of raw counts (genes x samples).
 #' @return A numeric matrix of CPM values (same dimensions), ready for PLIER2 input.
 #' @examples
-#' mat <- matrix(1:12, nrow = 3)
+#' mat <- matrix(seq_len(12), nrow = 3)
 #' cpmPLIER2(mat)
 #' @export
 cpmPLIER2 <- function(counts) {
@@ -779,8 +798,10 @@ cpmPLIER2 <- function(counts) {
 #' @return Invisibly returns the modified FBM (now holding CPM values).
 #' @examples
 #' library(bigstatsr)
-#' mat <- matrix(c(10,20,30, 40,50,60), nrow = 2,
-#'               dimnames = list(c("gene1","gene2"), paste0("sample", 1:3)))
+#' mat <- matrix(c(10, 20, 30, 40, 50, 60),
+#'   nrow = 2,
+#'   dimnames = list(c("gene1", "gene2"), paste0("sample", seq_len(3)))
+#' )
 #' fbm <- FBM(nrow(mat), ncol(mat), init = mat)
 #' cpmPLIER2FBM(fbm, block_size = 1)
 #' @export
@@ -796,10 +817,13 @@ cpmPLIER2FBM <- function(fbm_counts, block_size = 1000, ncores = 1) {
     options(bigstatsr.check.parallel.blas = FALSE)
     old_blas <- getOption("default.nproc.blas")
     options(default.nproc.blas = NULL)
-    on.exit({
-      options(bigstatsr.check.parallel.blas = TRUE)
-      options(default.nproc.blas = old_blas)
-    }, add = TRUE)
+    on.exit(
+      {
+        options(bigstatsr.check.parallel.blas = TRUE)
+        options(default.nproc.blas = old_blas)
+      },
+      add = TRUE
+    )
   }
 
   # Library sizes (sum per column), processed in column chunks
@@ -816,19 +840,18 @@ cpmPLIER2FBM <- function(fbm_counts, block_size = 1000, ncores = 1) {
   # Divide each column by its library size and scale to CPM, in-place
   bigstatsr::big_apply(
     fbm_counts,
-    a.FUN      = function(X, ind, libs) {
+    a.FUN = function(X, ind, libs) {
       blk <- X[, ind, drop = FALSE]
       blk <- sweep(blk, 2, libs[ind], "/") * 1e6
       X[, ind] <- blk
       integer(0)
     },
-    a.combine  = "c",
-    ind        = bigstatsr::cols_along(fbm_counts),
+    a.combine = "c",
+    ind = bigstatsr::cols_along(fbm_counts),
     block.size = block_size,
-    ncores     = ncores,
-    libs       = lib_sizes
+    ncores = ncores,
+    libs = lib_sizes
   )
 
   invisible(fbm_counts)
 }
-

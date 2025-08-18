@@ -4,7 +4,7 @@
 \alias{getMaxAUC}
 \title{Get maximum AUC per latent variable}
 \usage{
-getMaxAUC(summary, verbose = F)
+getMaxAUC(summary, verbose = FALSE)
 }
 \arguments{
 \item{summary}{A data frame (e.g., from \code{crossVal()}) .}

@@ -6,9 +6,14 @@
 \title{Major cell-type annotations}
 \format{
 A vector of length N with levels for major cell types.
+
+A data.frame with columns celltype and genes.
 }
 \usage{
 data(majorCellTypes)
+}
+\value{
+A data.frame of major cell type signatures.
 }
 \description{
 A factor (or character) vector annotating samples by major cell type.

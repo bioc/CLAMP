@@ -11,4 +11,6 @@
 #' @examples
 #' data(majorCellTypes)
 #' table(majorCellTypes)
+#' @format A data.frame with columns celltype and genes.
+#' @return A data.frame of major cell type signatures.
 "majorCellTypes"
