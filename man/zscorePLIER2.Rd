@@ -20,17 +20,20 @@ Centers each gene to mean 0 and scales to unit variance.
 }
 \examples{
 # simple 2 genes x 3 samples matrix
-Y <- matrix(c(
-  2, 4, 6,    # gene1 counts
-  8,10,12     # gene2 counts
-), nrow = 2, byrow = TRUE,
-dimnames = list(c("gene1","gene2"), paste0("sample",1:3)))
+Y <- matrix(
+    c(
+        2, 4, 6, # gene1 counts
+        8, 10, 12 # gene2 counts
+    ),
+    nrow = 2, byrow = TRUE,
+    dimnames = list(c('gene1', 'gene2'), paste0('sample', seq_len(3)))
+)
 
 # compute per‐gene mean and variance
 rowStats <- data.frame(
-  mean     = rowMeans(Y),
-  variance = apply(Y, 1, var),
-  row.names = rownames(Y)
+    mean = rowMeans(Y),
+    variance = apply(Y, 1, var),
+    row.names = rownames(Y)
 )
 
 # z‐score each row

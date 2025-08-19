@@ -21,7 +21,7 @@ preprocessPLIER2FBM(
 \item{var_cutoff}{Numeric or NULL. Minimum row variance to keep (NULL = no var filter).}
 
 \item{backingfile}{Character or NULL. Base name for the \emph{copy} FBM and filtered FBM on disk.
-If NULL, defaults to paste0(fbm$backingfile, "_preproc") and "_filtered".}
+If NULL, defaults to paste0(fbm$backingfile, '_preproc') and '_filtered'.}
 
 \item{block_size}{Number of rows to process at a time when copying data. Default is 1000.}
 
@@ -40,12 +40,15 @@ filters rows by mean/variance, and returns the filtered FBM plus stats and indic
 \examples{
 library(bigstatsr)
 # create a toy matrix and back it with an FBM
-mat <- matrix(c(
-  1,   2,   3,    # geneA
-  10, 20,  30,    # geneB
-  100,200,300     # geneC
-), nrow = 3, byrow = TRUE,
-dimnames = list(c("geneA","geneB","geneC"), paste0("s", 1:3)))
+mat <- matrix(
+    c(
+        1, 2, 3, # geneA
+        10, 20, 30, # geneB
+        100, 200, 300 # geneC
+    ),
+    nrow = 3, byrow = TRUE,
+    dimnames = list(c('geneA', 'geneB', 'geneC'), paste0('s', seq_len(3)))
+)
 fbm <- FBM(nrow(mat), ncol(mat), init = mat)
 
 # preprocess without filtering (all genes kept)

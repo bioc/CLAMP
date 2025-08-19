@@ -23,11 +23,13 @@ Standardizes each row of an FBM using provided row means and variances.
 }
 \examples{
 library(bigstatsr)
-fbm <- FBM(nrow = 2, ncol = 4,
-           init = matrix(1:8, nrow = 2))
+fbm <- FBM(
+    nrow = 2, ncol = 4,
+    init = matrix(seq_len(8), nrow = 2)
+)
 stats <- list(
-  row_means     = rowMeans(fbm[]),
-  row_variances = apply(fbm[], 1, var)
+    row_means     = rowMeans(fbm[]),
+    row_variances = apply(fbm[], 1, var)
 )
 zscorePLIER2FBM(fbm, stats, chunk_size = 2)
 }

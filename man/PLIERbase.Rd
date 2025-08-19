@@ -51,11 +51,16 @@ PLIERbase(
 
 \item{pos.adj}{Positive constraint adjustment divisor for L1. Default is 3.}
 
-\item{adaptive.p}{Controls adaptive sparsity in \code{Z}. After each ALS update, negative entries in \code{Z} are assumed to reflect noise. The cutoff for thresholding is set according to the probability of positive values under a reflected negative distribution—effectively zeroing out small positive entries likely to be noise. Smaller values lead to more sparsity. Default is 0.05.}
+\item{adaptive.p}{Controls adaptive sparsity in \code{Z}. After each ALS update,
+negative entries in \code{Z} are assumed to reflect noise.
+The cutoff for thresholding is set according to the probability of positive values under
+a reflected negative distribution—effectively zeroing out small positive entries likely to be noise.
+Smaller values lead to more sparsity. Default is 0.05.}
 
 \item{adaptive.iter}{Number of iterations before adaptive sparsity is applied. Default is 20.}
 
-\item{cutoff}{Scalar threshold to zero Z values when \code{Zpos = TRUE} and adaptive thresholding is not used. Default is 0.}
+\item{cutoff}{Scalar threshold to zero Z values when \code{Zpos = TRUE} and adaptive thresholding
+is not used. Default is 0.}
 
 \item{ncores}{Number of cores to use for parallel computation (only used if Y is an FBM). Default is 1.}
 }

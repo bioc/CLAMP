@@ -28,12 +28,14 @@ and per-gene statistics.
 \examples{
 # construct a small example matrix
 mat <- matrix(
-  c(1, 5, 10,
-    2, 6, 11,
-    3, 7, 12,
-    4, 8, 13),
-  nrow = 4, byrow = FALSE,
-  dimnames = list(paste0("gene", 1:4), paste0("sample", 1:3))
+    c(
+        1, 5, 10,
+        2, 6, 11,
+        3, 7, 12,
+        4, 8, 13
+    ),
+    nrow = 4, byrow = FALSE,
+    dimnames = list(paste0('gene', seq_len(4)), paste0('sample', seq_len(3)))
 )
 
 # keep genes with mean >= 6 and variance >= 2

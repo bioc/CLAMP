@@ -25,14 +25,14 @@ have at least \code{min.genes} matched genes.
 \examples{
 library(Matrix)
 # create a toy gene-by-pathway sparse matrix
-genes    <- paste0("g", 1:6)
+genes <- paste0("g", seq_len(6))
 pathways <- c("Path1", "Path2", "Path3")
 # Path1: g1, g2; Path2: g2, g3, g4; Path3: g5
 pathMat <- sparseMatrix(
-  i = c(1, 2, 2, 3, 4, 5),
-  j = c(1, 1, 2, 2, 2, 3),
-  dims     = c(length(genes), length(pathways)),
-  dimnames = list(genes, pathways)
+    i = c(1, 2, 2, 3, 4, 5),
+    j = c(1, 1, 2, 2, 2, 3),
+    dims = c(length(genes), length(pathways)),
+    dimnames = list(genes, pathways)
 )
 new.genes <- genes
 filtered <- getMatchedPathwayMat(pathMat, new.genes, min.genes = 2)

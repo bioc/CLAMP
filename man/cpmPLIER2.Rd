@@ -16,6 +16,6 @@ A numeric matrix of CPM values (same dimensions), ready for PLIER2 input.
 Compute counts-per-million (CPM) for PLIER2 pipelines
 }
 \examples{
-mat <- matrix(1:12, nrow = 3)
+mat <- matrix(seq_len(12), nrow = 3)
 cpmPLIER2(mat)
 }

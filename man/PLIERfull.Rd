@@ -96,7 +96,8 @@ small positive values, assuming they reflect noise. Default is 0.05.}
 
 \item{refitAll}{If \code{TRUE}, refits all U columns every update. Default is \code{FALSE}.}
 
-\item{useSE}{Logical; passed to the internal \code{solveU()} call. If \code{TRUE}, enables standard-error–aware selection when fitting U (pathway coefficients). Default is \code{FALSE}.}
+\item{useSE}{Logical; passed to the internal \code{solveU()} call. If \code{TRUE},
+enables standard-error–aware selection when fitting U (pathway coefficients). Default is \code{FALSE}.}
 
 \item{ncores}{Number of cores to use for parallel computation (only used if Y is an FBM). Default is 1.}
 }
@@ -133,7 +134,9 @@ mat <- matrix(rnorm(100), 10, 10)
 svdres <- rsvd::rsvd(mat, k = 5)
 base <- PLIERbase(Y = mat, k = 5, svdres = svdres, trace = FALSE)
 priorMat <- matrix(1, nrow(mat), 5)
-full <- PLIERfull(Y = mat, priorMat = priorMat, svdres = svdres,
-                  plier.base.result = base, k = 5,
-                  doCrossval = FALSE, trace = FALSE, max.U.updates = 0)
+full <- PLIERfull(
+    Y = mat, priorMat = priorMat, svdres = svdres,
+    plier.base.result = base, k = 5,
+    doCrossval = FALSE, trace = FALSE, max.U.updates = 0
+)
 }

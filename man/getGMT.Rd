@@ -9,7 +9,7 @@ getGMT(url, name = NULL, cache_dir = NULL, redownload = FALSE)
 \arguments{
 \item{url}{A character string specifying the URL to a GMT file.}
 
-\item{name}{Optional name for the GMT file (defaults to the portion after the last "=" in the URL).}
+\item{name}{Optional name for the GMT file (defaults to the portion after the last '=' in the URL).}
 
 \item{cache_dir}{Optional directory in which to cache/download the GMT file.}
 
@@ -23,7 +23,7 @@ Downloads a Gene Matrix Transposed (GMT) file from a specified URL, reads it int
 and removes the temporary file afterward.
 }
 \examples{
-url <- "https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=KEGG_2019_Human"
+url <- 'https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=KEGG_2019_Human'
 gmt_list <- getGMT(url)
 # list available gene sets
 names(gmt_list)

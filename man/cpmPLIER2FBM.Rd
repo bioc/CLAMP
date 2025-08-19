@@ -21,8 +21,10 @@ Compute CPM on a file-backed matrix for PLIER2 (in-place)
 }
 \examples{
 library(bigstatsr)
-mat <- matrix(c(10,20,30, 40,50,60), nrow = 2,
-              dimnames = list(c("gene1","gene2"), paste0("sample", 1:3)))
+mat <- matrix(c(10, 20, 30, 40, 50, 60),
+    nrow = 2,
+    dimnames = list(c('gene1', 'gene2'), paste0('sample', seq_len(3)))
+)
 fbm <- FBM(nrow(mat), ncol(mat), init = mat)
 cpmPLIER2FBM(fbm, block_size = 1)
 }
