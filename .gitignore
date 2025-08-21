@@ -8,7 +8,7 @@ output/
 # Session Data files
 .RData
 .RDataTmp
-.Rbuildignore
+# .Rbuildignore
 PLIER2.Rproj
 
 
