@@ -38,15 +38,12 @@ library(AnnotationDbi)
 library(org.Hs.eg.db)
 library(DT)
 
-ext <- system.file("extdata", package = "PLIER2")
 out_dir <- rappdirs::user_cache_dir("PLIER2")
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
-
-ext
 ```
 
 ```{r logo, echo=FALSE, eval=TRUE, out.width='40%'}
-# knitr::include_graphics("../man/figures/plier2.png", dpi = 800)
+knitr::include_graphics("../man/figures/plier2.png", dpi = 800)
 ```
 
 # Introduction
@@ -323,7 +320,7 @@ RAM—using the `cpmPLIER2FBM()` function from **PLIER2**:
 ## 2. Load HDF5 expression
 
 ```{r hdf5-load, message=FALSE}
-alz_path <- file.path(ext, "get_started", "human_gene_v2.5_alz.h5")
+alz_path <- file.path("get_started", "human_gene_v2.5_alz.h5")
 h5 <- H5File$new(alz_path, mode = "r")
 expr_mat <- t(h5[["data/expression"]]$read())
 genes <- h5[["meta/genes/symbol"]]$read()
@@ -462,7 +459,7 @@ diabetic (T2D) samples.
 ## 1. Load count data and map gene symbols
 
 ```{r islet-load, message=FALSE}
-islet_file <- file.path(ext, "get_started", "GSE164416_DP_htseq_counts.txt.gz")
+islet_file <- file.path("get_started", "GSE164416_DP_htseq_counts.txt.gz")
 
 islet_df <- read.table( islet_file, header = TRUE, stringsAsFactors = FALSE ) 
 
@@ -480,8 +477,13 @@ islet_df <- islet_df[!is.na(islet_df$symbol), ]
 ```{r islet-aggregate, message=FALSE}
 # Sum counts per symbol
 setDT(islet_df)
-num_cols <- names(islet_df)[sapply(islet_df, is.numeric)]
-expr <- islet_df[, lapply(.SD, sum), by = symbol, .SDcols = num_cols]
+num_cols <- names(islet_df)[vapply(islet_df, is.numeric, logical(1))]
+expr <- rbindlist(
+  lapply(split(islet_df, by = "symbol"), function(dt) {
+    setNames(lapply(num_cols, function(col) sum(dt[[col]])), num_cols)
+  }),
+  idcol = "symbol"
+)
 expr <- as.data.frame(expr)
 rownames(expr) <- expr$symbol
 expr$symbol <- NULL
@@ -606,7 +608,7 @@ we compute average LV expression per group to identify LVs that differ between h
 B_df <- as.data.frame(as.matrix(islet_fullRes$B)) %>%
     dplyr::mutate(LV = rownames(.))
 
-islet_meta <- file.path(ext, "get_started", "islets_metadata.csv")
+islet_meta <- file.path("get_started", "islets_metadata.csv")
 
 iselt_metadata <- read.csv(islet_meta, header = TRUE)
 

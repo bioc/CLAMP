@@ -14,7 +14,10 @@ vignette: >
 
 
 
-
+<div class="figure" style="text-align: center">
+<img src="../man/figures/plier2.png" alt="plot of chunk logo" width="40%" />
+<p class="caption">plot of chunk logo</p>
+</div>
 
 # Introduction
 
@@ -259,7 +262,7 @@ RAM—using the `cpmPLIER2FBM()` function from **PLIER2**:
 
 
 ``` r
-alz_path <- file.path(ext, "get_started", "human_gene_v2.5_alz.h5")
+alz_path <- file.path("get_started", "human_gene_v2.5_alz.h5")
 h5 <- H5File$new(alz_path, mode = "r")
 expr_mat <- t(h5[["data/expression"]]$read())
 genes <- h5[["meta/genes/symbol"]]$read()
@@ -414,7 +417,7 @@ diabetic (T2D) samples.
 
 
 ``` r
-islet_file <- file.path(ext, "get_started", "GSE164416_DP_htseq_counts.txt.gz")
+islet_file <- file.path("get_started", "GSE164416_DP_htseq_counts.txt.gz")
 
 islet_df <- read.table( islet_file, header = TRUE, stringsAsFactors = FALSE ) 
 
@@ -433,17 +436,17 @@ islet_df <- islet_df[!is.na(islet_df$symbol), ]
 ``` r
 # Sum counts per symbol
 setDT(islet_df)
-num_cols <- names(islet_df)[sapply(islet_df, is.numeric)]
-expr <- islet_df[, lapply(.SD, sum), by = symbol, .SDcols = num_cols]
-#> Error in .subset(x, j): invalid subscript type 'list'
+num_cols <- names(islet_df)[vapply(islet_df, is.numeric, logical(1))]
+expr <- rbindlist(
+  lapply(split(islet_df, by = "symbol"), function(dt) {
+    setNames(lapply(num_cols, function(col) sum(dt[[col]])), num_cols)
+  }),
+  idcol = "symbol"
+)
 expr <- as.data.frame(expr)
-#> Error in as.data.frame.default(expr): cannot coerce class '"function"' to a data.frame
 rownames(expr) <- expr$symbol
-#> Error in expr$symbol: object of type 'closure' is not subsettable
 expr$symbol <- NULL
-#> Error in expr$symbol <- NULL: object of type 'closure' is not subsettable
 expr <- as.matrix(expr)
-#> Error in as.vector(x, mode): cannot coerce type 'closure' to vector of type 'any'
 ```
 
 ## 3. CPM, preprocess and z-score
@@ -455,14 +458,10 @@ prep_is <- preprocessPLIER2(
     mean_cutoff = 0.5,
     var_cutoff = 0.1
 )
-#> Error in preprocessPLIER2(Y = expr, mean_cutoff = 0.5, var_cutoff = 0.1): `Y` must be a numeric matrix (genes x samples).
 
 iso_Yf <- prep_is$Y_filtered
-#> Error: object 'prep_is' not found
 iso_rowS <- prep_is$rowStats
-#> Error: object 'prep_is' not found
 iso_Yz <- zscorePLIER2(Y_filtered = iso_Yf, rowStats = iso_rowS)
-#> Error: object 'iso_Yf' not found
 ```
 
 ## 4. SVD computation and SVD K estimation
@@ -471,13 +470,10 @@ iso_Yz <- zscorePLIER2(Y_filtered = iso_Yf, rowStats = iso_rowS)
 ``` r
 # Determine SVD k for islet data
 n_genes_is <- nrow(iso_Yz)
-#> Error: object 'iso_Yz' not found
 n_samples_is <- ncol(iso_Yz)
-#> Error: object 'iso_Yz' not found
 SVD_K_is <- min(n_genes_is, n_samples_is) - 1
-#> Error: object 'n_genes_is' not found
 message("Using SVD K = ", SVD_K_is)
-#> Error: object 'SVD_K_is' not found
+#> Using SVD K = 132
 
 # Compute SVD with determined k
 
@@ -485,7 +481,6 @@ islet_svdRes <- rsvd(
     iso_Yz,
     k = SVD_K_is
 )
-#> Error: object 'iso_Yz' not found
 ```
 
 ## 5. Estimate K for PLIER
@@ -493,9 +488,9 @@ islet_svdRes <- rsvd(
 
 ``` r
 PLIER_K_is <- num.pc(data = iso_Yz)
-#> Error: object 'iso_Yz' not found
+#> Computing SVD
 message("Inferred PLIER k = ", PLIER_K_is)
-#> Error: object 'PLIER_K_is' not found
+#> Inferred PLIER k = 12
 ```
 
 ## 6. PLIERbase initialization
@@ -508,7 +503,6 @@ islet_baseRes <- PLIERbase(
     svdres = islet_svdRes,
     trace  = TRUE
 )
-#> Error: object 'iso_Yz' not found
 ```
 
 ## 7. Prepare pathway priors
@@ -523,9 +517,7 @@ islet_gmtList <- list(
 
 islet_pathMat <- gmtListToSparseMat(islet_gmtList)
 islet_matched <- getMatchedPathwayMat(islet_pathMat, rownames(iso_Yz))
-#> Error: object 'iso_Yz' not found
 islet_chatObj <- getChat(islet_matched)
-#> Error in h(simpleError(msg, call)): error in evaluating the argument 'x' in selecting a method for function 'colMeans': object 'islet_matched' not found
 ```
 
 ## 8. PLIERfull
@@ -543,7 +535,6 @@ islet_fullRes <- PLIERfull(
     trace             = TRUE,
     max.U.updates     = 50
 )
-#> Error: object 'islet_matched' not found
 ```
 
 ## 9. Display significant latent variables
@@ -556,7 +547,6 @@ islet_summary_df <- as.data.frame(islet_fullRes$summary) %>%
     dplyr::rename(LV = "LV index") %>%
     dplyr::mutate(LV = paste0("LV", LV)) %>%
     dplyr::select(LV, pathway, FDR, AUC)
-#> Error: object 'islet_fullRes' not found
 
 datatable(
     islet_summary_df,
@@ -569,8 +559,12 @@ datatable(
     class = "stripe hover compact"
 ) %>%
     formatSignif(c("AUC", "FDR"), 3)
-#> Error: object 'islet_summary_df' not found
 ```
+
+<div class="figure" style="text-align: center">
+<img src="figure/islet-summary-1.png" alt="plot of chunk islet-summary" width="80%" />
+<p class="caption">plot of chunk islet-summary</p>
+</div>
 
 In pancreatic islet RNA‑Seq, PLIER2 latent variables robustly capture islet-specific endocrine and metabolic programs.
 The top latent variable aligns with the GTEx “Pancreas Female 30-39 Up” signature, confirming tissue specificity. 
@@ -588,9 +582,8 @@ we compute average LV expression per group to identify LVs that differ between h
 ``` r
 B_df <- as.data.frame(as.matrix(islet_fullRes$B)) %>%
     dplyr::mutate(LV = rownames(.))
-#> Error: object 'islet_fullRes' not found
 
-islet_meta <- file.path(ext, "get_started", "islets_metadata.csv")
+islet_meta <- file.path("get_started", "islets_metadata.csv")
 
 iselt_metadata <- read.csv(islet_meta, header = TRUE)
 
@@ -601,16 +594,12 @@ sample_types <- iselt_metadata %>%
     )
 
 sample_cols <- setdiff(colnames(B_df), "LV")
-#> Error: object 'B_df' not found
 nd_cols <- intersect(sample_cols, sample_types$id[sample_types$type == "ND"])
-#> Error: object 'sample_cols' not found
 other_cols <- intersect(sample_cols, sample_types$id[sample_types$type != "ND"])
-#> Error: object 'sample_cols' not found
 
 if (length(nd_cols) == 0 || length(other_cols) == 0) {
     stop("No matching ND or non-ND sample columns found")
 }
-#> Error: object 'nd_cols' not found
 
 lv_stats_all_vs_nd <- B_df %>%
     dplyr::rowwise() %>%
@@ -627,18 +616,15 @@ lv_stats_all_vs_nd <- B_df %>%
     dplyr::mutate(FDR = stats::p.adjust(P_Value, method = "fdr")) %>%
     dplyr::select(LV, Mean_ND, Mean_All, Mean_Diff, P_Value, FDR) %>%
     dplyr::arrange(FDR)
-#> Error: object 'B_df' not found
 
 sig_lv_all_vs_nd <- lv_stats_all_vs_nd %>%
     dplyr::filter(FDR < 0.05)
-#> Error: object 'lv_stats_all_vs_nd' not found
 
 sig_pathway <- islet_summary_df %>%
     dplyr::filter(FDR < 0.05 & AUC > 0.7) %>%
     dplyr::filter(LV %in% sig_lv_all_vs_nd$LV) %>%
     dplyr::arrange(FDR) %>%
     dplyr::select(LV, pathway, FDR, AUC)
-#> Error: object 'islet_summary_df' not found
 
 datatable(
     sig_pathway,
@@ -651,8 +637,12 @@ datatable(
     class = "stripe hover compact"
 ) %>%
     formatSignif(c("AUC", "FDR"), 3)
-#> Error: object 'sig_pathway' not found
 ```
+
+<div class="figure" style="text-align: center">
+<img src="figure/islet-diff-1.png" alt="plot of chunk islet-diff" width="80%" />
+<p class="caption">plot of chunk islet-diff</p>
+</div>
 
 Differential latent-variable expression highlights diabetes-related inflammation and pancreatic specificity.
 LV8 enriched for TNF‑α signaling via NF‑κB and cytokine-response pathways, reflecting inflammatory β‑cell stress.
