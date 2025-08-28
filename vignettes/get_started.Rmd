@@ -323,7 +323,7 @@ RAM—using the `cpmPLIER2FBM()` function from **PLIER2**:
 ## 2. Load HDF5 expression
 
 ```{r hdf5-load, message=FALSE}
-alz_path <- file.path(ext, "get_started", "human_gene_v2.5_alz.h5")
+alz_path <- system.file("extdata", "human_gene_v2.5_alz.h5", package = "PLIER2Data")
 h5 <- H5File$new(alz_path, mode = "r")
 expr_mat <- t(h5[["data/expression"]]$read())
 genes <- h5[["meta/genes/symbol"]]$read()
@@ -462,7 +462,7 @@ diabetic (T2D) samples.
 ## 1. Load count data and map gene symbols
 
 ```{r islet-load, message=FALSE}
-islet_file <- file.path(ext, "get_started", "GSE164416_DP_htseq_counts.txt.gz")
+islet_file <- system.file("extdata", "GSE164416_DP_htseq_counts.txt.gz", package = "PLIER2Data")
 
 islet_df <- read.table( islet_file, header = TRUE, stringsAsFactors = FALSE ) 
 
@@ -606,8 +606,8 @@ we compute average LV expression per group to identify LVs that differ between h
 B_df <- as.data.frame(as.matrix(islet_fullRes$B)) %>%
     dplyr::mutate(LV = rownames(.))
 
-islet_meta <- file.path(ext, "get_started", "islets_metadata.csv")
-
+islet_meta <- system.file("extdata", "islets_metadata.csv", package = "PLIER2Data")
+# 
 iselt_metadata <- read.csv(islet_meta, header = TRUE)
 
 sample_types <- iselt_metadata %>%

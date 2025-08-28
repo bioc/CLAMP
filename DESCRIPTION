@@ -1,6 +1,6 @@
 Package: PLIER2
 Type: Package
-Title: Pathway-Level Information ExtractoR Version 2 for Gene Expression Analysis
+Title: Pathway-Level Information ExtractoR 2 
 Version: 0.99.0
 Authors@R: 
     c(
@@ -48,7 +48,8 @@ Suggests:
     org.Hs.eg.db,
     rappdirs,
     rmarkdown,
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    PLIER2Data
 VignetteBuilder: knitr
 Encoding: UTF-8
 LazyData: false
