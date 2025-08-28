@@ -12,12 +12,42 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+    collapse = TRUE,
+    comment = "#>",
+    eval = TRUE,
+    warning = FALSE,
+    message = FALSE,
+    fig.align = "center",
+    out.width = "80%"
+)
 
+library(dplyr)
+library(PLIER2)
+library(rsvd)
+library(glmnet)
+library(Matrix)
+library(hdf5r)
+library(data.table)
+library(bigstatsr)
+library(here)
+library(rsvd)
+library(Matrix)
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+library(DT)
 
-<div class="figure" style="text-align: center">
-<img src="../man/figures/plier2.png" alt="plot of chunk logo" width="40%" />
-<p class="caption">plot of chunk logo</p>
-</div>
+ext <- system.file("extdata", package = "PLIER2")
+out_dir <- rappdirs::user_cache_dir("PLIER2")
+dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
+
+ext
+```
+
+```{r logo, echo=FALSE, eval=TRUE, out.width='40%'}
+knitr::include_graphics("../man/figures/plier2.png", dpi = 800)
+```
 
 # Introduction
 
@@ -32,7 +62,72 @@ pathway-guided factor refinement (PLIERfull), enabling:
 
 ## Workflow overview
 
+```{r plier2-workflow, include=FALSE, warning=FALSE, out.width='90%'}
+library(DiagrammeR)
 
+grViz('
+ digraph PLIER2_pipeline {
+   graph [layout=dot, rankdir=TB, splines=ortho]
+
+   // ---- Inputs & Priors (gray) ----
+   DF     [shape=folder,   style=filled, fillcolor=Gray90, label="data.frame"]
+   H5     [shape=folder,   style=filled, fillcolor=Gray90, label="H5 file"]
+   GO     [shape=cylinder, style=filled, fillcolor=Gray90, label="GO Biological Process"]
+   MSIGDB [shape=cylinder, style=filled, fillcolor=Gray90, label="MSigDB Hallmark"]
+   GTEx   [shape=cylinder, style=filled, fillcolor=Gray90, label="GTEx Tissues"]
+
+   // ---- Functions (white) ----
+   node [shape=rectangle, style=filled, fillcolor=White]
+   preDF      [label="preprocessPLIER2()"]
+   zDF        [label="zscorePLIER2()"]
+   svdDF      [label="rsvd()"]
+   preFBM     [label="preprocessPLIER2FBM()"]
+   zFBM       [label="zscorePLIER2FBM()"]
+   svdFBM     [label="big_randomSVD()"]
+   numpc      [label="num.pc()"]
+   gmtList    [label="gmtListToSparseMat()"]
+   matchPaths [label="getMatchedPathwayMat()"]
+   chatFunc   [label="getChat()"]
+   base       [label="PLIERbase()"]
+   full       [label="PLIERfull()"]
+   dotplot    [label="dotplotPLIER()"]
+
+   // ---- Outputs (light‑blue tabs) ----
+   node [shape=tab, style=filled, fillcolor=LightBlue]
+   filtered     [label="Y_filtered, rowStats"]
+   zscored      [label="Y_zscored"]
+   svdres1      [label="svdres"]
+   filteredFBM  [label="FBM_filtered, rowStats"]
+   zscoredFBM   [label="FBM_zscored"]
+   svdres2      [label="svdres"]
+   PLIER_K      [label="PLIER_K"]
+   baseResult   [label="PLIERbase.result"]
+   Chat         [label="Chat"]
+   Zmat         [label="Z"]
+   Bmat         [label="B"]
+   summaryTbl   [label="summary"]
+   Umat         [label="U"]
+   dotImg       [label="PLIER dot plot"]
+
+   // ---- In‑memory branch ----
+   DF -> preDF -> filtered -> zDF -> zscored -> svdDF -> svdres1 -> base -> baseResult -> full
+   // ---- On‑disk branch ----
+   H5 -> preFBM -> filteredFBM -> zFBM -> zscoredFBM -> svdFBM -> svdres2 -> base
+   // ---- num.pc() branch ----
+   svdres1 -> numpc -> PLIER_K -> full
+   svdres2 -> numpc
+   // ---- Connect PLIER_K to PLIERbase too ----
+   PLIER_K -> base
+   // ---- Prior‑knowledge branch ----
+   GO -> gmtList; MSIGDB -> gmtList; GTEx -> gmtList
+   gmtList -> matchPaths -> chatFunc -> Chat
+   Chat -> full
+   // ---- PLIERfull outputs & dotplot ----
+   full -> Zmat; full -> Bmat; full -> summaryTbl -> dotplot; full -> Umat
+   // ---- Connect dotplotPLIER() to your tab node ----
+   dotplot -> dotImg
+ }')
+```
 
 # Quick Start
 
@@ -63,27 +158,11 @@ Each example follows these steps:
 
 In this chunk, we load the whole-blood expression matrix.
 
-
-``` r
+```{r load-data, message=FALSE}
 data("dataWholeBlood") # expression matrix
 
 dim(dataWholeBlood) # genes x samples
-#> [1] 11530    36
 head(dataWholeBlood) # genes x samples
-#>             BD8001    BD8002    BD8003    BD8004    BD8005    BD8006    BD8007    BD8008    BD8009    BD8010    BD8011    BD8012    BD8013    BD8015    BD8017    BD8018    BD8019    BD8020    BD8021    BD8024    BD8025    BD8026    BD8027    BD8028    BD8029    BD8030    BD8031    BD8032    BD8033    BD8034    BD8038    BD8041    BD8042    BD8043    BD8044
-#> GAS6      7.123563  7.846633  8.356313  7.387916  7.859675  7.057541  8.960098  8.120199  7.061915  7.467680  7.593766  7.980510  7.608529  7.524665  7.939325  8.391950  7.950956  7.560154  7.852542  8.388111  8.465422  7.924237  7.438211  7.562134  7.941111  7.476552  7.837566  7.576831  7.589572  7.751689  7.764586  7.526250  7.144113  7.874906  7.362536
-#> MMP14     6.636157  7.523565  7.033673  6.895476  6.860524  7.268107  7.121380  7.196859  6.764261  7.788809  6.925929  6.658480  7.035367  7.105207  6.905814  7.408872  6.958392  7.166190  6.294972  7.360992  7.649716  7.265736  6.875840  7.166484  7.365906  7.163581  7.026309  6.822608  7.197420  7.060375  6.712708  6.758632  6.506008  7.371407  7.299790
-#> MARCKSL1 10.632837 11.208832 10.519870 10.804867 10.940891 10.984602 11.258157 10.943532 11.242130 11.001261 11.094241 10.827391 10.850013 11.201983 11.088379 11.074874 10.699760 10.778236 11.107787 11.249868 11.004432 10.861711 10.859864 10.908438 10.817281 10.879364 10.540350 11.192079 10.913452 10.910316 10.731734 10.960063 10.852984 10.863946 11.093211
-#> SPARC    12.206811 11.462327 12.391210 12.457026 12.036049 12.010138 11.342475 10.979392 12.464739 11.297043 11.613255 12.116145 12.598474 12.364565 11.935750 12.469152 11.950393 11.285404 12.836662 12.553092 11.980064 11.762774 11.171782 12.461855 11.742365 13.040843 10.445423 11.940918 12.454682 11.457722 11.688371 11.563955 12.331355 11.409792 11.690587
-#> CTSD     13.147963 13.218464 12.574546 12.710222 13.151780 13.131948 13.466095 13.326034 12.885950 13.818859 13.065856 12.869455 12.964527 13.407112 13.669278 13.345946 13.097458 12.637596 13.481647 13.920715 13.477684 13.034718 12.819660 12.713603 12.618206 12.903100 12.837019 13.388076 12.851351 12.840063 12.448499 13.271724 12.993058 13.506943 13.312904
-#> EPAS1     7.011590  6.196898  6.621782  7.251964  6.792337  6.813567  6.785256  6.434220  6.310941  5.269084  6.223021  6.383971  5.728530  6.633363  7.215680  6.401987  6.834593  6.820674  6.909808  6.242905  6.770166  6.792149  6.321837  7.195378  6.219153  6.971319  7.149990  6.572446  6.573068  5.614770  7.084063  5.418134  6.325518  6.446405  6.739370
-#>             BD8045
-#> GAS6      8.315021
-#> MMP14     7.354577
-#> MARCKSL1 11.404975
-#> SPARC    12.448106
-#> CTSD     14.070121
-#> EPAS1     6.382976
 ```
 
 ## 2. Preprocess and z-score
@@ -91,8 +170,7 @@ head(dataWholeBlood) # genes x samples
 We first CPM-normalize the data (when needed), filter for genes with mean expression ≥ 0.5 
 and variance ≥ 0.1, and then apply z-score normalization.
 
-
-``` r
+```{r preprocess, message=TRUE}
 #  CPM normalization
 dataWholeBlood_cpm <- cpmPLIER2(dataWholeBlood)
 
@@ -119,14 +197,12 @@ wb_Y_z <- zscorePLIER2(
 
 Compute a robust SVD on the normalized matrix and infer the optimal number of latent variables K.
 
-
-``` r
+```{r svd-k, message=TRUE}
 # Determine SVD k
 n_genes <- nrow(wb_Y_z)
 n_samples <- ncol(wb_Y_z)
 SVD_K_wd <- min(n_genes, n_samples) - 1
 message("Using SVD K = ", SVD_K_wd)
-#> Using SVD K = 35
 
 # Compute full SVD
 
@@ -142,20 +218,16 @@ wb_svdRes <- rsvd(
 
 Estimate k via permutation/elbow method
 
-
-``` r
+```{r PLIER-k, message=TRUE}
 PLIER_K_wb <- num.pc(data = wb_Y_z)
-#> Computing SVD
 message("Inferred PLIER K = ", PLIER_K_wb)
-#> Inferred PLIER K = 7
 ```
 
 ## 5. PLIERbase initialization
 
 First, we initialize latent variables using `PLIERbase`, which performs matrix factorization without priors.
 
-
-``` r
+```{r PLIERbase, message=FALSE}
 wb_baseRes <- PLIERbase(
     Y      = wb_Y_z,
     k      = PLIER_K_wb,
@@ -168,8 +240,7 @@ wb_baseRes <- PLIERbase(
 
 Next, we build a prior matrix from curated gene sets and compute the Chat object for `PLIERfull`.
 
-
-``` r
+```{r priors, message=FALSE}
 wb_gmtList <- list(
     GTEx_Tissues = getGMT("https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=GTEx_Tissues_V8_2023"),
     BP = getGMT("https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=GO_Biological_Process_2025"),
@@ -185,8 +256,7 @@ wb_chatObj <- getChat(wb_matched)
 Finally, we refine the base model by integrating pathway priors using `PLIERfull`, 
 which applies cross-validation.
 
-
-``` r
+```{r PLIERfull, message=FALSE}
 wb_fullRes <- PLIERfull(
     Y                 = wb_Y_z,
     priorMat          = as.matrix(wb_matched),
@@ -202,8 +272,7 @@ wb_fullRes <- PLIERfull(
 
 ## 8. Display significant latent variables
 
-
-``` r
+```{r summary-table}
 # Display significant latent variables
 wb_summary_df <- as.data.frame(wb_fullRes$summary) %>%
     dplyr::filter(FDR < 0.05 & AUC > 0.7) %>%
@@ -225,11 +294,6 @@ datatable(
     formatSignif(c("AUC", "FDR"), 3)
 ```
 
-<div class="figure" style="text-align: center">
-<img src="figure/summary-table-1.png" alt="plot of chunk summary-table" width="80%" />
-<p class="caption">plot of chunk summary-table</p>
-</div>
-
 In whole-blood RNA-Seq, PLIER2 latent variables recapitulate heme metabolism, 
 mitochondrial ATP synthesis coupled electron transport (GO:0042775) and 
 oxidative phosphorylation (GO:0006119), pathways essential for oxygen delivery and energy 
@@ -244,13 +308,11 @@ This example uses HDF5 data from the ARCHS4 resource (Lachmann et al., 2018; DOI
 
 ## 1. Cleanup old FBM files
 
-
-``` r
+```{r fbm-cleanup, message=FALSE}
 output_dir <- here("output", "alzFBM")
 fbm_base <- file.path(output_dir, "FBMalz")
 bk_paths <- paste0(fbm_base, c(".bk", ".bk_preproc.bk", ".bk_preproc_filtered.bk"))
 file.remove(bk_paths[file.exists(bk_paths)])
-#> [1] TRUE TRUE TRUE
 ```
 
 ### Computing CPM on a File-Backed Matrix (FBM)
@@ -260,9 +322,8 @@ RAM—using the `cpmPLIER2FBM()` function from **PLIER2**:
 
 ## 2. Load HDF5 expression
 
-
-``` r
-alz_path <- file.path("get_started", "human_gene_v2.5_alz.h5")
+```{r hdf5-load, message=FALSE}
+alz_path <- file.path(ext, "get_started", "human_gene_v2.5_alz.h5")
 h5 <- H5File$new(alz_path, mode = "r")
 expr_mat <- t(h5[["data/expression"]]$read())
 genes <- h5[["meta/genes/symbol"]]$read()
@@ -274,8 +335,7 @@ rownames(expr_mat) <- genes
 
 ## 3. Construct file‑backed FBM
 
-
-``` r
+```{r fbm-construct, message=FALSE}
 dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 alzFBM <- FBM(nrow = nrow(expr_mat), ncol = ncol(expr_mat), backingfile = fbm_base)
 blk <- 1000
@@ -288,8 +348,7 @@ for (i in seq_len(ceiling(nrow(expr_mat) / blk))) {
 
 ## 4. CPM, preprocess and z‑score FBM
 
-
-``` r
+```{r fbm-preprocess, message=FALSE}
 prep_alz <- preprocessPLIER2FBM(
     fbm = alzFBM,
     mean_cutoff = 0.5,
@@ -304,14 +363,12 @@ alz_genes <- genes[prep_alz$kept_rows]
 
 ## 5. SVD computation and SVD K estimation
 
-
-``` r
+```{r fbm-svd, message=TRUE}
 g_fb <- nrow(alz_fbm_filt)
 samples_fb <- ncol(alz_fbm_filt)
 SVD_K_alz <- min(g_fb, samples_fb) - 1
 
 message("Using SVD K = ", SVD_K_alz)
-#> Using SVD K = 53
 
 set.seed(1)
 alz_svdRes <- big_randomSVD(alz_fbm_filt, k = SVD_K_alz)
@@ -319,17 +376,14 @@ alz_svdRes <- big_randomSVD(alz_fbm_filt, k = SVD_K_alz)
 
 ## 6. Estimate K for PLIER
 
-
-``` r
+```{r fbm-PLIER-k, message=TRUE}
 PLIER_K_alz <- num.pc(list(d = alz_svdRes$d))
 message("Inferred PLIER K = ", PLIER_K_alz)
-#> Inferred PLIER K = 17
 ```
 
 ## 7. PLIERbase initialization
 
-
-``` r
+```{r fbm-PLIERbase, message=FALSE}
 alz_baseRes <- PLIERbase(
     Y      = alz_fbm_filt,
     k      = PLIER_K_alz,
@@ -340,8 +394,7 @@ alz_baseRes <- PLIERbase(
 
 ## 8. Prepare pathway priors
 
-
-``` r
+```{r fbm-priors, message=FALSE}
 alz_gmtList <- list(
     GTEx_Tissues = getGMT("https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=GTEx_Tissues_V8_2023"),
     BP = getGMT("https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=GO_Biological_Process_2025"),
@@ -355,8 +408,7 @@ alz_chatObj <- getChat(alz_matched)
 
 ## 9. PLIERfull
 
-
-``` r
+```{r fbm-PLIERfull, message=FALSE}
 alz_fullRes <- PLIERfull(
     Y                 = alz_fbm_filt,
     priorMat          = as.matrix(alz_matched),
@@ -371,8 +423,7 @@ alz_fullRes <- PLIERfull(
 ```
 
 ## 10. Display significant latent variables
-
-``` r
+```{r fbm-summary}
 alz_summary_df <- as.data.frame(alz_fullRes$summary) %>%
     filter(FDR < 0.1 & AUC > 0.6) %>%
     arrange(FDR) %>%
@@ -393,11 +444,6 @@ datatable(
     formatSignif(c("AUC", "FDR"), 3)
 ```
 
-<div class="figure" style="text-align: center">
-<img src="figure/fbm-summary-1.png" alt="plot of chunk fbm-summary" width="80%" />
-<p class="caption">plot of chunk fbm-summary</p>
-</div>
-
 For the Alzheimer’s brain dataset, the leading latent variable matches the GTEx tissue signature “Brain - Spinal Cord 
 (Cervical C-1) Male 50-59 Up” confirming tissue specificity in neuroanatomical context. Additional enriched processes 
 include: Potassium Ion Transmembrane Transport, which emphasizes neuronal excitability and ion homeostasis;
@@ -415,9 +461,8 @@ diabetic (T2D) samples.
 
 ## 1. Load count data and map gene symbols
 
-
-``` r
-islet_file <- file.path("get_started", "GSE164416_DP_htseq_counts.txt.gz")
+```{r islet-load, message=FALSE}
+islet_file <- file.path(ext, "get_started", "GSE164416_DP_htseq_counts.txt.gz")
 
 islet_df <- read.table( islet_file, header = TRUE, stringsAsFactors = FALSE ) 
 
@@ -432,17 +477,11 @@ islet_df <- islet_df[!is.na(islet_df$symbol), ]
 
 ## 2. Aggregate counts by gene symbol
 
-
-``` r
+```{r islet-aggregate, message=FALSE}
 # Sum counts per symbol
 setDT(islet_df)
-num_cols <- names(islet_df)[vapply(islet_df, is.numeric, logical(1))]
-expr <- rbindlist(
-  lapply(split(islet_df, by = "symbol"), function(dt) {
-    setNames(lapply(num_cols, function(col) sum(dt[[col]])), num_cols)
-  }),
-  idcol = "symbol"
-)
+num_cols <- names(islet_df)[sapply(islet_df, is.numeric)]
+expr <- islet_df[, lapply(.SD, sum), by = symbol, .SDcols = num_cols]
 expr <- as.data.frame(expr)
 rownames(expr) <- expr$symbol
 expr$symbol <- NULL
@@ -451,8 +490,7 @@ expr <- as.matrix(expr)
 
 ## 3. CPM, preprocess and z-score
 
-
-``` r
+```{r islet-preprocess, message=FALSE}
 prep_is <- preprocessPLIER2(
     Y = expr,
     mean_cutoff = 0.5,
@@ -466,14 +504,12 @@ iso_Yz <- zscorePLIER2(Y_filtered = iso_Yf, rowStats = iso_rowS)
 
 ## 4. SVD computation and SVD K estimation
 
-
-``` r
+```{r islet-svd, message=TRUE}
 # Determine SVD k for islet data
 n_genes_is <- nrow(iso_Yz)
 n_samples_is <- ncol(iso_Yz)
 SVD_K_is <- min(n_genes_is, n_samples_is) - 1
 message("Using SVD K = ", SVD_K_is)
-#> Using SVD K = 132
 
 # Compute SVD with determined k
 
@@ -485,18 +521,14 @@ islet_svdRes <- rsvd(
 
 ## 5. Estimate K for PLIER
 
-
-``` r
+```{r islet-k, message=TRUE}
 PLIER_K_is <- num.pc(data = iso_Yz)
-#> Computing SVD
 message("Inferred PLIER k = ", PLIER_K_is)
-#> Inferred PLIER k = 12
 ```
 
 ## 6. PLIERbase initialization
 
-
-``` r
+```{r islet-PLIERbase, message=FALSE}
 islet_baseRes <- PLIERbase(
     Y      = iso_Yz,
     k      = PLIER_K_is,
@@ -507,8 +539,7 @@ islet_baseRes <- PLIERbase(
 
 ## 7. Prepare pathway priors
 
-
-``` r
+```{r islet-priors, message=FALSE}
 islet_gmtList <- list(
     GTEx_Tissues = getGMT("https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=GTEx_Tissues_V8_2023"),
     Diabetes_Perturbations = getGMT("https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=Diabetes_Perturbations_GEO_2022"),
@@ -522,8 +553,7 @@ islet_chatObj <- getChat(islet_matched)
 
 ## 8. PLIERfull
 
-
-``` r
+```{r islet-PLIERfull, message=FALSE}
 islet_fullRes <- PLIERfull(
     Y                 = iso_Yz,
     priorMat          = as.matrix(islet_matched),
@@ -539,8 +569,7 @@ islet_fullRes <- PLIERfull(
 
 ## 9. Display significant latent variables
 
-
-``` r
+```{r islet-summary}
 islet_summary_df <- as.data.frame(islet_fullRes$summary) %>%
     filter(FDR < 0.05 & AUC > 0.7) %>%
     arrange(FDR) %>%
@@ -561,11 +590,6 @@ datatable(
     formatSignif(c("AUC", "FDR"), 3)
 ```
 
-<div class="figure" style="text-align: center">
-<img src="figure/islet-summary-1.png" alt="plot of chunk islet-summary" width="80%" />
-<p class="caption">plot of chunk islet-summary</p>
-</div>
-
 In pancreatic islet RNA‑Seq, PLIER2 latent variables robustly capture islet-specific endocrine and metabolic programs.
 The top latent variable aligns with the GTEx “Pancreas Female 30-39 Up” signature, confirming tissue specificity. 
 Enrichment of Myc Targets V1 and TNF‑α Signaling via NF‑κB reflects proliferative and inflammatory pathways active in islets.
@@ -578,12 +602,11 @@ highlight pathological and developmental perturbations associated with diabetes.
 Rows of the B matrix correspond to LVs and columns to samples. By grouping samples by condition (ND vs T2D),
 we compute average LV expression per group to identify LVs that differ between healthy and diabetic islets
 
-
-``` r
+```{r islet-diff, message=FALSE}
 B_df <- as.data.frame(as.matrix(islet_fullRes$B)) %>%
     dplyr::mutate(LV = rownames(.))
 
-islet_meta <- file.path("get_started", "islets_metadata.csv")
+islet_meta <- file.path(ext, "get_started", "islets_metadata.csv")
 
 iselt_metadata <- read.csv(islet_meta, header = TRUE)
 
@@ -639,11 +662,6 @@ datatable(
     formatSignif(c("AUC", "FDR"), 3)
 ```
 
-<div class="figure" style="text-align: center">
-<img src="figure/islet-diff-1.png" alt="plot of chunk islet-diff" width="80%" />
-<p class="caption">plot of chunk islet-diff</p>
-</div>
-
 Differential latent-variable expression highlights diabetes-related inflammation and pancreatic specificity.
 LV8 enriched for TNF‑α signaling via NF‑κB and cytokine-response pathways, reflecting inflammatory β‑cell stress.
 LV3, associated with adipose and CBP‑KO islet gene sets, suggests metabolic adaptation in disease.
@@ -666,36 +684,6 @@ The following PLIER2 functions accept an `ncores` parameter:
 
 # Session Information
 
-
-``` r
+```{r session-info}
 sessionInfo()
-#> R version 4.5.1 (2025-06-13)
-#> Platform: aarch64-apple-darwin24.4.0
-#> Running under: macOS Sequoia 15.6
-#> 
-#> Matrix products: default
-#> BLAS:   /System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/libBLAS.dylib 
-#> LAPACK: /opt/homebrew/Cellar/r/4.5.1/lib/R/lib/libRlapack.dylib;  LAPACK version 3.12.1
-#> 
-#> locale:
-#> [1] en_US.UTF-8/en_US.UTF-8/en_US.UTF-8/C/en_US.UTF-8/en_US.UTF-8
-#> 
-#> time zone: America/New_York
-#> tzcode source: internal
-#> 
-#> attached base packages:
-#> [1] stats4    stats     graphics  grDevices utils     datasets  methods   base     
-#> 
-#> other attached packages:
-#>  [1] DiagrammeR_1.0.11    DT_0.33              org.Hs.eg.db_3.21.0  AnnotationDbi_1.70.0 IRanges_2.42.0       S4Vectors_0.46.0     Biobase_2.68.0       BiocGenerics_0.54.0  generics_0.1.4       here_1.0.1           bigstatsr_1.6.2      data.table_1.17.8    hdf5r_1.3.12         glmnet_4.1-10        Matrix_1.7-3         rsvd_1.0.5          
-#> [17] PLIER2_0.99.0        dplyr_1.1.4          testthat_3.2.3       devtools_2.4.5       usethis_3.1.0       
-#> 
-#> loaded via a namespace (and not attached):
-#>  [1] DBI_1.2.3               pkgdev_0.1.0.9060       remotes_2.5.0           rlang_1.1.6             magrittr_2.0.3          compiler_4.5.1          RSQLite_2.4.3           png_0.1-8               callr_3.7.6             vctrs_0.6.5             profvis_0.4.0           pkgconfig_2.0.3         shape_1.4.6.1           crayon_1.5.3           
-#> [15] fastmap_1.2.0           XVector_0.48.0          ellipsis_0.3.2          promises_1.3.3          sessioninfo_1.2.3       UCSC.utils_1.4.0        ps_1.9.1                purrr_1.1.0             bit_4.6.0               xfun_0.53               cachem_1.1.0            rmio_0.4.0              GenomeInfoDb_1.44.1     jsonlite_2.0.0         
-#> [29] blob_1.2.4              later_1.4.3             irlba_2.3.5.1           parallel_4.5.1          R6_2.6.1                bslib_0.9.0             RColorBrewer_1.1-3      pkgload_1.4.0           jquerylib_0.1.4         brio_1.1.5              Rcpp_1.1.0              iterators_1.0.14        knitr_1.50              httpuv_1.6.16          
-#> [43] splines_4.5.1           tidyselect_1.2.1        yaml_2.3.10             rstudioapi_0.17.1       doParallel_1.0.17       codetools_0.2-20        miniUI_0.1.2            processx_3.8.6          pkgbuild_1.4.8          lattice_0.22-7          tibble_3.3.0            shiny_1.11.1            withr_3.0.2             KEGGREST_1.48.1        
-#> [57] evaluate_1.0.4          survival_3.8-3          urlchecker_1.0.1        Biostrings_2.76.0       pillar_1.11.0           foreach_1.5.2           bigassertr_0.1.7        rprojroot_2.1.0         ggplot2_3.5.2           scales_1.4.0            ff_4.5.2                xtable_1.8-4            glue_1.8.0              tools_4.5.1            
-#> [71] RSpectra_0.16-2         webshot_0.5.5           visNetwork_2.1.2        fs_1.6.6                cowplot_1.2.0           grid_4.5.1              crosstalk_1.2.1         GenomeInfoDbData_1.2.14 flock_0.7               cli_3.6.5               rappdirs_0.3.3          bigparallelr_0.3.2      gtable_0.3.6            sass_0.4.10            
-#> [85] digest_0.6.37           ggrepel_0.9.6           htmlwidgets_1.6.4       farver_2.1.2            memoise_2.0.1           htmltools_0.5.8.1       lifecycle_1.0.4         httr_1.4.7              mime_0.13               bit64_4.6.0-1
 ```

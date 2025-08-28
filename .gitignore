@@ -8,6 +8,7 @@ output/
 # Session Data files
 .RData
 .RDataTmp
+.Rbuildignore
 PLIER2.Rproj
 
 
@@ -36,9 +37,6 @@ vignettes/*.pdf
 # knitr and R markdown default cache directories
 *_cache/
 /cache/
-
-# PLIER2 cache/temp files
-*.gmt
 
 # Temporary files created by R markdown
 *.utf8.md

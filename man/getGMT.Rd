@@ -24,7 +24,7 @@ and removes the temporary file afterward.
 }
 \examples{
 url <- 'https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=KEGG_2019_Human'
-gmt_list <- getGMT(url, cache_dir = tempdir())
+gmt_list <- getGMT(url)
 # list available gene sets
 names(gmt_list)
 # inspect the first few genes in the first gene set
