@@ -181,6 +181,7 @@ getGMT <- function(url, name = NULL, cache_dir = NULL, redownload = FALSE) {
     }
     if (is.null(cache_dir)) {
         cache_dir <- system.file("extdata", package = "PLIER2")
+        if (!nzchar(cache_dir)) cache_dir <- tools::R_user_dir("PLIER2", "cache")
     }
     cache_file <- file.path(cache_dir, paste0(name, ".gmt"))
     if (!file.exists(cache_file) || redownload) {
@@ -194,6 +195,7 @@ getGMT <- function(url, name = NULL, cache_dir = NULL, redownload = FALSE) {
     }
     read_gmt(cache_file)
 }
+
 
 #' Read a GMT file into a list
 #'
@@ -214,6 +216,7 @@ read_gmt <- function(filename) {
     }
     return(gmt)
 }
+
 
 #' Convert a list of GMT gene sets to a sparse matrix
 #'
