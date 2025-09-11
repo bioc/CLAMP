@@ -492,7 +492,7 @@ AUC <- function(labels, values) {
         auc <- 0.5
         pval <- NA
     }
-    list(auc = auc, pval = pval)
+    list(auc = auc, pval = pval, npos=posn, nneg=negn)
 }
 
 #' Cross-validation AUC for PLIER latent variables and pathways
@@ -512,41 +512,43 @@ AUC <- function(labels, values) {
 #'   \item{\code{summary}}{Data frame with pathway, LV index, AUC, p-value, and FDR}
 #' }
 crossVal <- function(plierRes, priorMat, priorMatcv) {
-    out <- matrix(ncol = 4, nrow = 0)
-    ii <- which(Matrix::colSums(plierRes$U) > 0)
+  ii <- which(Matrix::colSums(plierRes$U) > 0)
 
-    Uauc <- Matrix::Matrix(0, nrow = nrow(plierRes$U), ncol = ncol(plierRes$U), sparse = TRUE)
-    Up <- Matrix::Matrix(0, nrow = nrow(plierRes$U), ncol = ncol(plierRes$U), sparse = TRUE)
+  Uauc <- Matrix::Matrix(0, nrow = nrow(plierRes$U), ncol = ncol(plierRes$U), sparse = TRUE)
+  Up   <- Matrix::Matrix(0, nrow = nrow(plierRes$U), ncol = ncol(plierRes$U), sparse = TRUE)
 
-    for (i in ii) { # for each column in U
+  results <- list()
 
-        iipath <- which(plierRes$U[, i] > 0) # get the pathways
+  for (i in ii) {
+    iipath <- which(plierRes$U[, i] > 0)
 
-        if (length(iipath) > 1) { # more than one pathway
-            for (j in iipath) {
-                iiheldout <- which((rowSums(priorMat[, iipath, drop = FALSE]) == 0) |
-                    (priorMat[, j] > 0 & priorMatcv[, j] == 0))
-                aucres <- AUC(priorMat[iiheldout, j], plierRes$Z[iiheldout, i])
-                out <- rbind(out, c(colnames(priorMat)[j], i, aucres$auc, aucres$pval))
-                Uauc[j, i] <- aucres$auc
-                Up[j, i] <- -log10(aucres$pval)
-            }
-        } else {
-            j <- iipath
-            iiheldout <- which((rowSums(matrix(priorMat[, iipath], ncol = 1)) == 0) |
-                (priorMat[, j] > 0 & priorMatcv[, j] == 0))
-            aucres <- AUC(priorMat[iiheldout, j], plierRes$Z[iiheldout, i])
-            out <- rbind(out, c(colnames(priorMat)[j], i, aucres$auc, aucres$pval))
-            Uauc[j, i] <- aucres$auc
-            Up[j, i] <- -log10(aucres$pval)
-        } # else
+    for (j in iipath) {
+      iiheldout <- which((rowSums(priorMat[, iipath, drop = FALSE]) == 0) |
+                           (priorMat[, j] > 0 & priorMatcv[, j] == 0))
+
+      aucres <- AUC(priorMat[iiheldout, j], plierRes$Z[iiheldout, i])
+
+
+      results[[length(results) + 1]] <- data.frame(
+        pathway  = colnames(priorMat)[j],
+        LV_index = i,
+        AUC      = aucres$auc,
+        p_value  = aucres$pval,
+        FDR      = NA_real_,   # placeholder
+        npos     = aucres$npos,
+        nneg     = aucres$nneg,
+        stringsAsFactors = FALSE
+      )
+
+      Uauc[j, i] <- aucres$auc
+      Up[j, i]   <- -log10(aucres$pval)
     }
-    out <- data.frame(out, stringsAsFactors = FALSE)
-    out[, 3] <- as.numeric(out[, 3])
-    out[, 4] <- as.numeric(out[, 4])
-    out[, 5] <- BH(out[, 4])
-    colnames(out) <- c("pathway", "LV index", "AUC", "p-value", "FDR")
-    return(list(Uauc = Uauc, Upval = Up, summary = out))
+  }
+
+  out <- do.call(rbind, results)
+  out$FDR <- BH(out$p_value)
+
+  return(list(Uauc = Uauc, Upval = Up, summary = out))
 }
 
 #' PLIER base matrix factorization
