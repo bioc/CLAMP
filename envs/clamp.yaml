@@ -40,7 +40,10 @@ dependencies:
   - bioconductor-ensdb.hsapiens.v86
   - bioconductor-experimenthub
   - bioconductor-genomeinfodbdata
+<<<<<<< HEAD
   - bioconductor-bioccheck
+=======
+>>>>>>> 4a6a32006624b942c847becd71f73baf7dedfed6
 
   # Other R utilities
   - r-plyr
