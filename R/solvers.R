@@ -148,7 +148,7 @@ binarizeTop <- function(Z, top, keepVals = TRUE) {
 #' @param scale Whether to standardize predictors in glmnet. Default is \code{TRUE}.
 #' @param refit Whether to perform relaxed refitting using selected predictors. Default is \code{TRUE}.
 #' @param Uprev (Optional) Previous U matrix to reuse. In this mode only the columns of \code{U}
-#' that are all zero are estimated. Used internally in \code{PLIER2}.
+#' that are all zero are estimated. Used internally in \code{CLAMP}.
 #' @param ... Additional arguments passed to \code{glmnet()} or \code{cv.glmnet()}.
 #'
 #' @return A list with one element:
@@ -495,13 +495,13 @@ AUC <- function(labels, values) {
     list(auc = auc, pval = pval, npos=posn, nneg=negn)
 }
 
-#' Cross-validation AUC for PLIER latent variables and pathways
+#' Cross-validation AUC for CLAMP latent variables and pathways
 #'
-#' Evaluates how well each latent variable in a PLIER model captures held-out pathway annotations,
+#' Evaluates how well each latent variable in a CLAMP model captures held-out pathway annotations,
 #' using cross-validation over the prior matrix. For each latent variable and associated pathway,
-#' held-out genes are selected and the AUC is computed using their scores in \code{plierRes$Z}.
+#' held-out genes are selected and the AUC is computed using their scores in \code{clampRes$Z}.
 #'
-#' @param plierRes A list containing \code{U} (loadings) and \code{Z} (scores) from a PLIER model.
+#' @param clampRes A list containing \code{U} (loadings) and \code{Z} (scores) from a CLAMP model.
 #' @param priorMat A binary matrix (genes x pathways) indicating original pathway annotations.
 #' @param priorMatcv A version of \code{priorMat} used to mask held-out annotations for cross-validation.
 #'
@@ -511,22 +511,22 @@ AUC <- function(labels, values) {
 #'   \item{\code{Upval}}{Matrix of \code{-log10(p)} values (pathways x LVs)}
 #'   \item{\code{summary}}{Data frame with pathway, LV index, AUC, p-value, and FDR}
 #' }
-crossVal <- function(plierRes, priorMat, priorMatcv) {
-  ii <- which(Matrix::colSums(plierRes$U) > 0)
+crossVal <- function(clampRes, priorMat, priorMatcv) {
+  ii <- which(Matrix::colSums(clampRes$U) > 0)
 
-  Uauc <- Matrix::Matrix(0, nrow = nrow(plierRes$U), ncol = ncol(plierRes$U), sparse = TRUE)
-  Up   <- Matrix::Matrix(0, nrow = nrow(plierRes$U), ncol = ncol(plierRes$U), sparse = TRUE)
+  Uauc <- Matrix::Matrix(0, nrow = nrow(clampRes$U), ncol = ncol(clampRes$U), sparse = TRUE)
+  Up   <- Matrix::Matrix(0, nrow = nrow(clampRes$U), ncol = ncol(clampRes$U), sparse = TRUE)
 
   results <- list()
 
   for (i in ii) {
-    iipath <- which(plierRes$U[, i] > 0)
+    iipath <- which(clampRes$U[, i] > 0)
 
     for (j in iipath) {
       iiheldout <- which((rowSums(priorMat[, iipath, drop = FALSE]) == 0) |
                            (priorMat[, j] > 0 & priorMatcv[, j] == 0))
 
-      aucres <- AUC(priorMat[iiheldout, j], plierRes$Z[iiheldout, i])
+      aucres <- AUC(priorMat[iiheldout, j], clampRes$Z[iiheldout, i])
 
 
       results[[length(results) + 1]] <- data.frame(
@@ -551,9 +551,9 @@ crossVal <- function(plierRes, priorMat, priorMatcv) {
   return(list(Uauc = Uauc, Upval = Up, summary = out))
 }
 
-#' PLIER base matrix factorization
+#' CLAMP base matrix factorization
 #'
-#' Runs the core matrix factorization procedure of PLIER (Pathway-Level Information ExtractoR),
+#' Runs the core matrix factorization procedure of CLAMP,
 #' decomposing the gene expression matrix \code{Y} into latent variables \code{Z} and loadings \code{B}.
 #' It supports sparse, dense, and Filebacked Big Matrices (FBM) as input and includes options for
 #' adaptive sparsity, positive constraints, and regularization.
@@ -590,7 +590,7 @@ crossVal <- function(plierRes, priorMat, priorMatcv) {
 #' }
 #'
 #' @details
-#' This function is the low-level implementation of PLIER. It alternates between solving for \code{Z}
+#' This function is the low-level implementation of CLAMP. It alternates between solving for \code{Z}
 #' given \code{B} and solving for \code{B} given \code{Z}, with optional sparsity and non-negativity
 #' constraints on \code{Z}. Convergence is assessed via relative change in \code{B}.
 #'
@@ -598,13 +598,13 @@ crossVal <- function(plierRes, priorMat, priorMatcv) {
 #' # small toy dataset: 5 genes x 4 samples
 #' Y <- matrix(rnorm(5 * 4), nrow = 5, ncol = 4)
 #' # run a single iteration for speed
-#' res <- PLIERbase(Y, k = 2, max.iter = 1, trace = FALSE)
+#' res <- CLAMPbase(Y, k = 2, max.iter = 1, trace = FALSE)
 #' # inspect dimensions of B and Z
 #' dim(res$B)
 #' dim(res$Z)
 #'
 #' @export
-PLIERbase <- function(
+CLAMPbase <- function(
         Y, k, svdres = NULL, L1 = NULL, L2 = NULL,
         Zpos = TRUE, max.iter = 200, tol = 5e-4, trace = FALSE,
         rseed = NULL, B = NULL, scale = 1, pos.adj = 3, adaptive.p = 0.05, adaptive.iter = 20,
@@ -761,19 +761,19 @@ PLIERbase <- function(
     }
 }
 
-#' Full PLIER model with prior information and cross-validation
+#' Full CLAMP model with prior information and cross-validation
 #'
-#' Runs the full PLIER (Pathway-Level Information ExtractoR) model using a gene expression matrix
+#' Runs the full CLAMP model using a gene expression matrix
 #' and prior pathway annotation matrix. This function performs latent variable decomposition
 #' guided by prior knowledge and includes optional cross-validation to evaluate pathway associations.
 #'
 #' @param Y Gene expression matrix (genes x samples). Can be dense, sparse (dgCMatrix), or FBM.
 #' @param priorMat Binary matrix (genes x pathways) representing prior annotations.
 #' @param svdres Optional SVD result used for initialization.
-#' @param plier.base.result Optional result from \code{PLIERbase()} to initialize B.
+#' @param clamp.base.result Optional result from \code{CLAMPbase()} to initialize B.
 #' @param k Number of latent variables. If \code{NULL}, estimated from SVD.
-#' @param L1 Regularization strength for Z. If \code{NULL}, initialized from SVD or \code{plier.base.result}.
-#' @param L2 Regularization strength for B. If \code{NULL}, initialized from SVD or \code{plier.base.result}.
+#' @param L1 Regularization strength for Z. If \code{NULL}, initialized from SVD or \code{clamp.base.result}.
+#' @param L2 Regularization strength for B. If \code{NULL}, initialized from SVD or \code{clamp.base.result}.
 #' @param top If set, keeps only top-n values per column in Z during U updates.
 #' @param cvn Number of folds for cross-validation in U updates. Default is 5.
 #' @param max.iter Maximum number of iterations. Default is 350.
@@ -825,16 +825,16 @@ PLIERbase <- function(
 #' @examples
 #' mat <- matrix(rnorm(100), 10, 10)
 #' svdres <- rsvd::rsvd(mat, k = 5)
-#' base <- PLIERbase(Y = mat, k = 5, svdres = svdres, trace = FALSE)
+#' base <- CLAMPbase(Y = mat, k = 5, svdres = svdres, trace = FALSE)
 #' priorMat <- matrix(1, nrow(mat), 5)
-#' full <- PLIERfull(
+#' full <- CLAMPfull(
 #'     Y = mat, priorMat = priorMat, svdres = svdres,
-#'     plier.base.result = base, k = 5,
+#'     clamp.base.result = base, k = 5,
 #'     doCrossval = FALSE, trace = FALSE, max.U.updates = 0
 #' )
 #' @export
-PLIERfull <- function(
-        Y, priorMat, svdres = NULL, plier.base.result = NULL, k = NULL, L1 = NULL, L2 = NULL, top = NULL,
+CLAMPfull <- function(
+        Y, priorMat, svdres = NULL, clamp.base.result = NULL, k = NULL, L1 = NULL, L2 = NULL, top = NULL,
         cvn = 5, max.iter = 350, trace = FALSE, Chat = NULL, maxPath = 10, doCrossval = TRUE,
         penalty.factor = rep(1, ncol(priorMat)), glm_alpha = 0.9,
         minGenes = 10, tol = 5e-4, seed = 123456, allGenes = FALSE, rseed = NULL,
@@ -854,7 +854,7 @@ PLIERfull <- function(
 
     priorMat <- as.matrix(priorMat)
 
-    message("**PLIER v2 **")
+    message("** CLAMP **")
 
     # Detect matrix type
     is_fbm <- inherits(Y, "FBM")
@@ -919,7 +919,7 @@ PLIERfull <- function(
         message("SVD V has the wrong number of columns")
         svdres <- NULL
     }
-    if (is.null(svdres) && is.null(plier.base.result)) {
+    if (is.null(svdres) && is.null(clamp.base.result)) {
         message("Computing SVD")
         if (ns > 500) {
             message("Using rsvd")
@@ -930,44 +930,44 @@ PLIERfull <- function(
         }
         message("Done")
     }
-    if (is.null(plier.base.result)) {
+    if (is.null(clamp.base.result)) {
         if (is.null(k)) {
             k <- floor(sqrt(ncol(Y)))
             k <- min(k, floor(ncol(Y) * 0.9))
             message("k is set to ", k)
         }
 
-        message("Running PLIERbase")
-        if (is.null(plier.base.result)) {
-            plier.base.result <- PLIERbase(Y, k = k)
+        message("Running CLAMPbase")
+        if (is.null(clamp.base.result)) {
+            clamp.base.result <- CLAMPbase(Y, k = k)
         }
     } else {
-        message("using provided PLIERbase result")
+        message("using provided CLAMPbase result")
 
-        if (nrow(Y) != nrow(plier.base.result$Z)) {
-            if (is.null(rownames(Y)) | is.null(rownames(plier.base.result$Z))) {
-                stop("Y and plier.base.result$Z must have equal row numbers or row names")
+        if (nrow(Y) != nrow(clamp.base.result$Z)) {
+            if (is.null(rownames(Y)) | is.null(rownames(clamp.base.result$Z))) {
+                stop("Y and clamp.base.result$Z must have equal row numbers or row names")
             }
-            plier.base.result$Z <- plier.base.result$Z[rownames(Y), ]
+            clamp.base.result$Z <- clamp.base.result$Z[rownames(Y), ]
         }
         u.iter <- 2
-        k <- ncol(plier.base.result$Z)
+        k <- ncol(clamp.base.result$Z)
     }
 
-    Z <- plier.base.result$Z
+    Z <- clamp.base.result$Z
 
     if (is.null(L1)) {
-        L1 <- plier.base.result$L1
+        L1 <- clamp.base.result$L1
     }
     if (is.null(L2)) {
-        L2 <- plier.base.result$L2
+        L2 <- clamp.base.result$L2
     }
     L1 <- L1 * multiplier
     L2 <- L2 / multiplier
     message("L1=", L1, "; L2=", L2)
 
-    if (ncol(plier.base.result$B) == ncol(Y)) {
-        B <- plier.base.result$B
+    if (ncol(clamp.base.result$B) == ncol(Y)) {
+        B <- clamp.base.result$B
     }
 
     oldB <- B
@@ -1152,14 +1152,14 @@ PLIERfull <- function(
     return(out)
 }
 
-#' Project new data into PLIER latent space
+#' Project new data into CLAMP latent space
 #'
 #' Computes the latent loadings \code{B} for new gene expression data using the latent variables
-#' \code{Z} from a fitted PLIER model. This allows transfer of the learned latent structure to
+#' \code{Z} from a fitted CLAMP model. This allows transfer of the learned latent structure to
 #' new datasets with matched genes.
 #'
-#' @param PLIERres A result object from \code{PLIERfull()} or \code{PLIERbase()}, containing at least \code{Z} and \code{L2}.
-#' @param newdata A gene expression matrix (genes x samples) to be projected. Must have the same genes (rows) as \code{PLIERres$Z}.
+#' @param CLAMPres A result object from \code{CLAMPfull()} or \code{CLAMPbase()}, containing at least \code{Z} and \code{L2}.
+#' @param newdata A gene expression matrix (genes x samples) to be projected. Must have the same genes (rows) as \code{CLAMPres$Z}.
 #'        Can be a standard matrix, sparse matrix, or FBM/big.matrix.
 #' @param scale Optional numeric multiplier for the L2 regularization terms. Default is 1.
 #' @param ncores Number of cores to use for parallel computation (only used if newdata is an FBM).
@@ -1168,23 +1168,23 @@ PLIERfull <- function(
 #'
 #' @details
 #' This function uses ridge-regularized least squares to compute \code{B = solve(ZᵗZ + L2·I) · ZᵗY}, where
-#' \code{Z} is the latent matrix from the trained PLIER model and \code{Y} is the new dataset.
+#' \code{Z} is the latent matrix from the trained CLAMP model and \code{Y} is the new dataset.
 #' If \code{newdata} is a Filebacked Big Matrix (FBM), the computation
 #' is optimized using \code{bigstatsr::big_cprodMat()}.
 #'
 #' @examples
-#' # fit a tiny PLIER model for projection
+#' # fit a tiny CLAMP model for projection
 #' Y0 <- matrix(rnorm(5 * 3), nrow = 5)
-#' base <- PLIERbase(Y0, k = 2, max.iter = 1, trace = FALSE)
+#' base <- CLAMPbase(Y0, k = 2, max.iter = 1, trace = FALSE)
 #' # new data with same 5 genes
 #' newY <- matrix(rnorm(5 * 2), nrow = 5)
-#' projB <- projectPLIER(base, newdata = newY)
+#' projB <- projectCLAMP(base, newdata = newY)
 #' # check dimensions: 2 latent vars x 2 samples
 #' dim(projB)
 #'
 #' @export
-projectPLIER <- function(PLIERres, newdata, scale = 1, ncores = 1) {
-    stopifnot(nrow(PLIERres$Z) == nrow(newdata))
+projectCLAMP <- function(CLAMPres, newdata, scale = 1, ncores = 1) {
+    stopifnot(nrow(CLAMPres$Z) == nrow(newdata))
 
     if (ncores > 1) {
         # if we are parallelizing, then disable BLAS parallelization
@@ -1197,7 +1197,7 @@ projectPLIER <- function(PLIERres, newdata, scale = 1, ncores = 1) {
     is_fbm <- inherits(newdata, c("big.matrix", "FBM"))
 
     # Convert Matrix package matrices to standard R matrices for compatibility
-    Z_matrix <- if (inherits(PLIERres$Z, "Matrix")) as.matrix(PLIERres$Z) else PLIERres$Z
+    Z_matrix <- if (inherits(CLAMPres$Z, "Matrix")) as.matrix(CLAMPres$Z) else CLAMPres$Z
 
     if (is_fbm) {
         # FBM implementation - use big_cprodMat for efficient computation
@@ -1211,7 +1211,7 @@ projectPLIER <- function(PLIERres, newdata, scale = 1, ncores = 1) {
 
     # Calculate the regularization matrix using standard matrix operations
     ZtZ <- t(Z_matrix) %*% Z_matrix
-    L2k <- PLIERres$L2 * diag(ncol(Z_matrix)) * scale
+    L2k <- CLAMPres$L2 * diag(ncol(Z_matrix)) * scale
 
     # Solve the regularized system
     B <- solve(ZtZ + L2k) %*% ZY

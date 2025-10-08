@@ -1,4 +1,4 @@
-test_that("zscorePLIER2FBM applies Z‐score in‐place on an FBM", {
+test_that("zscoreCLAMPFBM applies Z‐score in‐place on an FBM", {
     mat <- matrix(c(2, 4, 6, 8), nrow = 2, byrow = TRUE)
     fbm <- bigstatsr::FBM(nrow(mat), ncol(mat), init = mat)
     stats <- list(
@@ -7,7 +7,7 @@ test_that("zscorePLIER2FBM applies Z‐score in‐place on an FBM", {
     )
 
     expect_message(
-        zscorePLIER2FBM(fbm, stats, chunk_size = ncol(mat)),
+        zscoreCLAMPFBM(fbm, stats, chunk_size = ncol(mat)),
     )
 
     out <- fbm[, ]

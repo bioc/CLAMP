@@ -180,8 +180,8 @@ getGMT <- function(url, name = NULL, cache_dir = NULL, redownload = FALSE) {
         message("Auto-detected name: ", name)
     }
     if (is.null(cache_dir)) {
-        cache_dir <- system.file("extdata", package = "PLIER2")
-        if (!nzchar(cache_dir)) cache_dir <- tools::R_user_dir("PLIER2", "cache")
+        cache_dir <- system.file("extdata", package = "CLAMP")
+        if (!nzchar(cache_dir)) cache_dir <- tools::R_user_dir("CLAMP", "cache")
     }
     cache_file <- file.path(cache_dir, paste0(name, ".gmt"))
     if (!file.exists(cache_file) || redownload) {
@@ -420,11 +420,11 @@ filterFBM <- function(fbm, rowStats, mean_cutoff = NULL, var_cutoff = NULL, back
     return(list(fbm_filtered = fbm_filtered, kept_rows = which(keep_rows)))
 }
 
-#' Z-score a filtered expression matrix for PLIER2
+#' Z-score a filtered expression matrix for CLAMP
 #'
 #' Centers each gene to mean 0 and scales to unit variance.
 #'
-#' @param Y_filtered Numeric matrix (genes x samples) returned by preprocessPLIER2
+#' @param Y_filtered Numeric matrix (genes x samples) returned by preprocessCLAMP
 #' @param rowStats   Data frame with numeric columns `mean` and `variance`,
 #'                   row-named to match `rownames(Y_filtered)`
 #'
@@ -448,9 +448,9 @@ filterFBM <- function(fbm, rowStats, mean_cutoff = NULL, var_cutoff = NULL, back
 #' )
 #'
 #' # z‐score each row
-#' Y_z <- zscorePLIER2(Y, rowStats)
+#' Y_z <- zscoreCLAMP(Y, rowStats)
 #' @export
-zscorePLIER2 <- function(Y_filtered, rowStats) {
+zscoreCLAMP <- function(Y_filtered, rowStats) {
     # Input validation
     if (!is.matrix(Y_filtered) || !is.numeric(Y_filtered)) {
         stop("`Y_filtered` must be a numeric matrix (genes x samples).")
@@ -481,7 +481,7 @@ zscorePLIER2 <- function(Y_filtered, rowStats) {
     return(Y_scaled)
 }
 
-#' Preprocess a bigstatsr FBM for PLIER2
+#' Preprocess a bigstatsr FBM for CLAMP
 #'
 #' Makes a writable copy of the input FBM, cleans it (log2 transform if needed, fill NAs),
 #' filters rows by mean/variance, and returns the filtered FBM plus stats and indices.
@@ -512,9 +512,9 @@ zscorePLIER2 <- function(Y_filtered, rowStats) {
 #' fbm <- FBM(nrow(mat), ncol(mat), init = mat)
 #'
 #' # preprocess without filtering (all genes kept)
-#' res_all <- preprocessPLIER2FBM(fbm)
+#' res_all <- preprocessCLAMPFBM(fbm)
 #' @export
-preprocessPLIER2FBM <- function(fbm, mean_cutoff = NULL, var_cutoff = NULL, backingfile = NULL,
+preprocessCLAMPFBM <- function(fbm, mean_cutoff = NULL, var_cutoff = NULL, backingfile = NULL,
     block_size = 1000, ncores = 1) {
     n_r <- nrow(fbm)
     n_c <- ncol(fbm)
@@ -571,7 +571,7 @@ preprocessPLIER2FBM <- function(fbm, mean_cutoff = NULL, var_cutoff = NULL, back
 #'
 #' Standardizes each row of an FBM using provided row means and variances.
 #'
-#' @param fbm_filtered A bigstatsr::FBM produced by preprocessPLIER2FBM().
+#' @param fbm_filtered A bigstatsr::FBM produced by preprocessCLAMPFBM().
 #' @param rowStats A list with row_means and row_variances from that FBM.
 #' @param chunk_size Columns per block (default 1000).
 #' @param ncores Integer; number of cores to use for parallel operations (default 1).
@@ -585,10 +585,10 @@ preprocessPLIER2FBM <- function(fbm, mean_cutoff = NULL, var_cutoff = NULL, back
 #'     row_means     = rowMeans(fbm[]),
 #'     row_variances = apply(fbm[], 1, var)
 #' )
-#' zscorePLIER2FBM(fbm, stats, chunk_size = 2)
+#' zscoreCLAMPFBM(fbm, stats, chunk_size = 2)
 #' @return A normalized FBM with z-scored rows.
 #' @export
-zscorePLIER2FBM <- function(fbm_filtered, rowStats, chunk_size = 1000, ncores = 1) {
+zscoreCLAMPFBM <- function(fbm_filtered, rowStats, chunk_size = 1000, ncores = 1) {
     message("Applying Z-score transformation")
     means <- rowStats$row_means
     sds <- sqrt(rowStats$row_variances)
@@ -616,7 +616,7 @@ zscorePLIER2FBM <- function(fbm_filtered, rowStats, chunk_size = 1000, ncores = 
     invisible(NULL)
 }
 
-#' Preprocess an expression matrix for PLIER2
+#' Preprocess an expression matrix for CLAMP
 #'
 #' Filters genes by mean expression and variance, returning the filtered matrix
 #' and per-gene statistics.
@@ -644,9 +644,9 @@ zscorePLIER2FBM <- function(fbm_filtered, rowStats, chunk_size = 1000, ncores = 
 #' )
 #'
 #' # keep genes with mean >= 6 and variance >= 2
-#' res <- preprocessPLIER2(mat, mean_cutoff = 6, var_cutoff = 2)
+#' res <- preprocessCLAMP(mat, mean_cutoff = 6, var_cutoff = 2)
 #' @export
-preprocessPLIER2 <- function(Y, mean_cutoff = 0, var_cutoff = 0) {
+preprocessCLAMP <- function(Y, mean_cutoff = 0, var_cutoff = 0) {
     if (!is.matrix(Y) || !is.numeric(Y)) {
         stop("`Y` must be a numeric matrix (genes x samples).")
     }
@@ -670,15 +670,15 @@ preprocessPLIER2 <- function(Y, mean_cutoff = 0, var_cutoff = 0) {
     return(list(Y_filtered = Y_filtered, rowStats = rowStats_filtered, kept_rows = keep))
 }
 
-#' Compute counts-per-million (CPM) for PLIER2 pipelines
+#' Compute counts-per-million (CPM) for CLAMP pipelines
 #'
 #' @param counts A numeric matrix or data.frame of raw counts (genes x samples).
-#' @return A numeric matrix of CPM values (same dimensions), ready for PLIER2 input.
+#' @return A numeric matrix of CPM values (same dimensions), ready for CLAMP input.
 #' @examples
 #' mat <- matrix(seq_len(12), nrow = 3)
-#' cpmPLIER2(mat)
+#' cpmCLAMP(mat)
 #' @export
-cpmPLIER2 <- function(counts) {
+cpmCLAMP <- function(counts) {
     mat <- if (is.data.frame(counts)) {
         as.matrix(counts)
     } else {
@@ -693,7 +693,7 @@ cpmPLIER2 <- function(counts) {
 }
 
 
-#' Compute CPM on a file-backed matrix for PLIER2 (in-place)
+#' Compute CPM on a file-backed matrix for CLAMP (in-place)
 #'
 #' @param fbm_counts A bigstatsr::FBM of raw counts (genes x samples).
 #' @param block_size Integer; columns per block (default 1000).
@@ -706,9 +706,9 @@ cpmPLIER2 <- function(counts) {
 #'     dimnames = list(c('gene1', 'gene2'), paste0('sample', seq_len(3)))
 #' )
 #' fbm <- FBM(nrow(mat), ncol(mat), init = mat)
-#' cpmPLIER2FBM(fbm, block_size = 1)
+#' cpmCLAMPFBM(fbm, block_size = 1)
 #' @export
-cpmPLIER2FBM <- function(fbm_counts, block_size = 1000, ncores = 1) {
+cpmCLAMPFBM <- function(fbm_counts, block_size = 1000, ncores = 1) {
     if (!inherits(fbm_counts, "FBM")) {
         stop("`fbm_counts` must be a bigstatsr::FBM object.")
     }

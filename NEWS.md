@@ -1,4 +1,4 @@
-# PLIER2 0.99.0
+# CLAMP 0.99.0
 
 ## New features
 - Initial Bioconductor submission.

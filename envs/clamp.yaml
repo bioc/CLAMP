@@ -1,4 +1,4 @@
-name: plier2
+name: clamp
 channels:
   - conda-forge
   - bioconda
@@ -38,6 +38,8 @@ dependencies:
   - bioconductor-fgsea
   - bioconductor-org.Hs.eg.db
   - bioconductor-ensdb.hsapiens.v86
+  - bioconductor-experimenthub
+  - bioconductor-genomeinfodbdata
 
   # Other R utilities
   - r-plyr

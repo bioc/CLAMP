@@ -1,4 +1,4 @@
-test_that("zscorePLIER2 centers and scales each row", {
+test_that("zscoreCLAMP centers and scales each row", {
     Y <- matrix(c(2, 4, 6, 8),
         nrow = 2, byrow = TRUE,
         dimnames = list(c("g1", "g2"), c("s1", "s2"))
@@ -14,7 +14,7 @@ test_that("zscorePLIER2 centers and scales each row", {
         check.names = FALSE
     )
 
-    Z <- zscorePLIER2(Y, rowStats = rowStats)
+    Z <- zscoreCLAMP(Y, rowStats = rowStats)
 
     expected <- sweep(Y, 1, mu, "-")
     expected <- sweep(expected, 1, sqrt(var_pop), "/")
