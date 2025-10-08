@@ -55,7 +55,7 @@ Can be used incombination with \code{top}. Default is \code{FALSE}.}
 \item{refit}{Whether to perform relaxed refitting using selected predictors. Default is \code{TRUE}.}
 
 \item{Uprev}{(Optional) Previous U matrix to reuse. In this mode only the columns of \code{U}
-that are all zero are estimated. Used internally in \code{PLIER2}.}
+that are all zero are estimated. Used internally in \code{CLAMP}.}
 
 \item{...}{Additional arguments passed to \code{glmnet()} or \code{cv.glmnet()}.}
 }

@@ -1,13 +1,13 @@
 ---
-title: "Analyzing human whole blood RNA-Seq data with PLIER2"
+title: "Analyzing human whole blood RNA-Seq data with CLAMP"
 author: "Marc Subirana-Granés and Maria Chikina"
-package: PLIER2
+package: CLAMP
 output: 
   BiocStyle::html_document:
     fig_width: 7
     fig_height: 5
 vignette: >
-  %\VignetteIndexEntry{Analyzing human whole blood RNA-Seq data with PLIER2}
+  %\VignetteIndexEntry{Analyzing human whole blood RNA-Seq data with CLAMP}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -24,7 +24,7 @@ knitr::opts_chunk$set(
 )
 
 library(dplyr)
-library(PLIER2)
+library(CLAMP)
 library(rsvd)
 library(glmnet)
 library(Matrix)
@@ -38,23 +38,24 @@ library(AnnotationDbi)
 library(org.Hs.eg.db)
 library(DT)
 
-ext <- system.file("extdata", package = "PLIER2")
-out_dir <- rappdirs::user_cache_dir("PLIER2")
+ext <- system.file("extdata", package = "CLAMP")
+out_dir <- rappdirs::user_cache_dir("CLAMP")
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
 ext
 ```
 
 ```{r logo, echo=FALSE, eval=TRUE, out.width='40%'}
-knitr::include_graphics("../man/figures/plier2.png", dpi = 800)
+knitr::include_graphics("../man/figures/clamp.png", dpi = 800)
 ```
 
 # Introduction
 
-The **PLIER2** package provides a two-stage framework to extract interpretable latent
+The CLAMP (**C**ompressed **L**atent-variable **A**pproach for **M**assive data **P**rocessing) 
+package provides a two-stage framework to extract interpretable latent
 variables from high-dimensional transcriptomic data.
-It combines a standard matrix decomposition (PLIERbase) with
-pathway-guided factor refinement (PLIERfull), enabling:
+It combines a standard matrix decomposition (CLAMPbase) with
+pathway-guided factor refinement (CLAMPfull), enabling:
 
 1. **Dimensionality reduction** of gene expression matrices  
 2. **Incorporation of prior knowledge** (e.g., Gene Ontology or MSigDB)  
@@ -62,11 +63,11 @@ pathway-guided factor refinement (PLIERfull), enabling:
 
 ## Workflow overview
 
-```{r plier2-workflow, include=FALSE, warning=FALSE, out.width='90%'}
+```{r CLAMP-workflow, include=FALSE, warning=FALSE, out.width='90%'}
 library(DiagrammeR)
 
 grViz('
- digraph PLIER2_pipeline {
+ digraph CLAMP_pipeline {
    graph [layout=dot, rankdir=TB, splines=ortho]
 
    // ---- Inputs & Priors (gray) ----
@@ -78,19 +79,19 @@ grViz('
 
    // ---- Functions (white) ----
    node [shape=rectangle, style=filled, fillcolor=White]
-   preDF      [label="preprocessPLIER2()"]
-   zDF        [label="zscorePLIER2()"]
+   preDF      [label="preprocessCLAMP()"]
+   zDF        [label="zscoreCLAMP()"]
    svdDF      [label="rsvd()"]
-   preFBM     [label="preprocessPLIER2FBM()"]
-   zFBM       [label="zscorePLIER2FBM()"]
+   preFBM     [label="preprocessCLAMPFBM()"]
+   zFBM       [label="zscoreCLAMPFBM()"]
    svdFBM     [label="big_randomSVD()"]
    numpc      [label="num.pc()"]
    gmtList    [label="gmtListToSparseMat()"]
    matchPaths [label="getMatchedPathwayMat()"]
    chatFunc   [label="getChat()"]
-   base       [label="PLIERbase()"]
-   full       [label="PLIERfull()"]
-   dotplot    [label="dotplotPLIER()"]
+   base       [label="CLAMPbase()"]
+   full       [label="CLAMPfull()"]
+   dotplot    [label="dotplotCLAMP()"]
 
    // ---- Outputs (light‑blue tabs) ----
    node [shape=tab, style=filled, fillcolor=LightBlue]
@@ -100,31 +101,31 @@ grViz('
    filteredFBM  [label="FBM_filtered, rowStats"]
    zscoredFBM   [label="FBM_zscored"]
    svdres2      [label="svdres"]
-   PLIER_K      [label="PLIER_K"]
-   baseResult   [label="PLIERbase.result"]
+   CLAMP_K      [label="CLAMP_K"]
+   baseResult   [label="CLAMPbase.result"]
    Chat         [label="Chat"]
    Zmat         [label="Z"]
    Bmat         [label="B"]
    summaryTbl   [label="summary"]
    Umat         [label="U"]
-   dotImg       [label="PLIER dot plot"]
+   dotImg       [label="CLAMP dot plot"]
 
    // ---- In‑memory branch ----
    DF -> preDF -> filtered -> zDF -> zscored -> svdDF -> svdres1 -> base -> baseResult -> full
    // ---- On‑disk branch ----
    H5 -> preFBM -> filteredFBM -> zFBM -> zscoredFBM -> svdFBM -> svdres2 -> base
    // ---- num.pc() branch ----
-   svdres1 -> numpc -> PLIER_K -> full
+   svdres1 -> numpc -> CLAMP_K -> full
    svdres2 -> numpc
-   // ---- Connect PLIER_K to PLIERbase too ----
-   PLIER_K -> base
+   // ---- Connect CLAMP_K to CLAMPbase too ----
+   CLAMP_K -> base
    // ---- Prior‑knowledge branch ----
    GO -> gmtList; MSIGDB -> gmtList; GTEx -> gmtList
    gmtList -> matchPaths -> chatFunc -> Chat
    Chat -> full
-   // ---- PLIERfull outputs & dotplot ----
+   // ---- CLAMPfull outputs & dotplot ----
    full -> Zmat; full -> Bmat; full -> summaryTbl -> dotplot; full -> Umat
-   // ---- Connect dotplotPLIER() to your tab node ----
+   // ---- Connect dotplotCLAMP() to your tab node ----
    dotplot -> dotImg
  }')
 ```
@@ -135,7 +136,7 @@ We provide three self-contained examples:
 
 1. **Data-frame example (whole blood):**  
    A small dataset loaded entirely into memory. Shows basic preprocessing,
-    z-scoring, and running PLIER2 without on-disk storage.  
+    z-scoring, and running CLAMP without on-disk storage.  
 
 2. **HDF5 example (Alzheimer’s brain):**  
    Demonstrates how to import expression from an HDF5 file, create a file-backed FBM object,
@@ -149,8 +150,8 @@ Each example follows these steps:
 1. **Load & preprocess data** (filter by mean/variance, then z-score)  
 2. **Prepare pathway annotations** via `getGMT()` and construct the prior matrix  
 3. **Compute SVD** (in-memory or file-backed) and infer model dimension `k`  
-4. **Run PLIERbase** to initialize latent variables  
-5. **Run PLIERfull** to refine with pathway priors and obtain summary statistics  
+4. **Run CLAMPbase** to initialize latent variables  
+5. **Run CLAMPfull** to refine with pathway priors and obtain summary statistics  
 
 # Example 1: In-memory data.frame (Whole Blood)
 
@@ -172,10 +173,10 @@ and variance ≥ 0.1, and then apply z-score normalization.
 
 ```{r preprocess, message=TRUE}
 #  CPM normalization
-dataWholeBlood_cpm <- cpmPLIER2(dataWholeBlood)
+dataWholeBlood_cpm <- cpmCLAMP(dataWholeBlood)
 
 # Filter and compute row statistics
-prep_wb <- preprocessPLIER2(
+prep_wb <- preprocessCLAMP(
     Y = dataWholeBlood_cpm,
     mean_cutoff = 0.5,
     var_cutoff = 0.1
@@ -187,7 +188,7 @@ wb_rowStats <- prep_wb$rowStats
 
 
 # Z-score normalization
-wb_Y_z <- zscorePLIER2(
+wb_Y_z <- zscoreCLAMP(
     Y_filtered = wb_Y_filtered,
     rowStats = wb_rowStats
 )
@@ -214,23 +215,23 @@ wb_svdRes <- rsvd(
 )
 ```
 
-## 4. Estimate K for PLIER 
+## 4. Estimate K for CLAMP 
 
 Estimate k via permutation/elbow method
 
-```{r PLIER-k, message=TRUE}
-PLIER_K_wb <- num.pc(data = wb_Y_z)
-message("Inferred PLIER K = ", PLIER_K_wb)
+```{r CLAMP-k, message=TRUE}
+CLAMP_K_wb <- num.pc(data = wb_Y_z)
+message("Inferred CLAMP K = ", CLAMP_K_wb)
 ```
 
-## 5. PLIERbase initialization
+## 5. CLAMPbase initialization
 
-First, we initialize latent variables using `PLIERbase`, which performs matrix factorization without priors.
+First, we initialize latent variables using `CLAMPbase`, which performs matrix factorization without priors.
 
-```{r PLIERbase, message=FALSE}
-wb_baseRes <- PLIERbase(
+```{r CLAMPbase, message=FALSE}
+wb_baseRes <- CLAMPbase(
     Y      = wb_Y_z,
-    k      = PLIER_K_wb,
+    k      = CLAMP_K_wb,
     svdres = wb_svdRes,
     trace  = TRUE
 )
@@ -238,7 +239,7 @@ wb_baseRes <- PLIERbase(
 
 ## 6. Prepare pathway priors
 
-Next, we build a prior matrix from curated gene sets and compute the Chat object for `PLIERfull`.
+Next, we build a prior matrix from curated gene sets and compute the Chat object for `CLAMPfull`.
 
 ```{r priors, message=FALSE}
 wb_gmtList <- list(
@@ -251,17 +252,17 @@ wb_matched <- getMatchedPathwayMat(wb_pathMat, rownames(wb_Y_z))
 wb_chatObj <- getChat(wb_matched)
 ```
 
-## 7. PLIERfull
+## 7. CLAMPfull
 
-Finally, we refine the base model by integrating pathway priors using `PLIERfull`, 
+Finally, we refine the base model by integrating pathway priors using `CLAMPfull`, 
 which applies cross-validation.
 
-```{r PLIERfull, message=FALSE}
-wb_fullRes <- PLIERfull(
+```{r CLAMPfull, message=FALSE}
+wb_fullRes <- CLAMPfull(
     Y                 = wb_Y_z,
     priorMat          = as.matrix(wb_matched),
     svdres            = wb_svdRes,
-    plier.base.result = wb_baseRes,
+    clamp.base.result = wb_baseRes,
     Chat              = wb_chatObj,
     k                 = wb_k_pl,
     doCrossval        = TRUE,
@@ -277,7 +278,7 @@ wb_fullRes <- PLIERfull(
 wb_summary_df <- as.data.frame(wb_fullRes$summary) %>%
     dplyr::filter(FDR < 0.05 & AUC > 0.7) %>%
     dplyr::arrange(FDR) %>%
-    dplyr::rename(LV = "LV index") %>%
+    dplyr::rename(LV = "LV_index") %>%
     dplyr::mutate(LV = paste0("LV", LV)) %>%
     dplyr::select(LV, pathway, FDR, AUC)
 
@@ -294,7 +295,7 @@ datatable(
     formatSignif(c("AUC", "FDR"), 3)
 ```
 
-In whole-blood RNA-Seq, PLIER2 latent variables recapitulate heme metabolism, 
+In whole-blood RNA-Seq, CLAMP latent variables recapitulate heme metabolism, 
 mitochondrial ATP synthesis coupled electron transport (GO:0042775) and 
 oxidative phosphorylation (GO:0006119), pathways essential for oxygen delivery and energy 
 generation in blood. Heme metabolism reflects erythroid lineage activity and hemoglobin production in 
@@ -318,12 +319,15 @@ file.remove(bk_paths[file.exists(bk_paths)])
 ### Computing CPM on a File-Backed Matrix (FBM)
 
 For file-backed matrices (FBMs), you can compute counts-per-million (CPM) in-place—without loading the entire dataset into
-RAM—using the `cpmPLIER2FBM()` function from **PLIER2**:
+RAM—using the `cpmCLAMPFBM()` function from **CLAMP**:
 
 ## 2. Load HDF5 expression
 
 ```{r hdf5-load, message=FALSE}
-alz_path <- system.file("extdata", "human_gene_v2.5_alz.h5", package = "PLIER2Data")
+# waiting for bioconductor data package
+# alz_path <- system.file("extdata", "human_gene_v2.5_alz.h5", package = "CLAMPData")
+
+alz_path <- here("extdata", "human_gene_v2.5_alz.h5")
 h5 <- H5File$new(alz_path, mode = "r")
 expr_mat <- t(h5[["data/expression"]]$read())
 genes <- h5[["meta/genes/symbol"]]$read()
@@ -349,7 +353,7 @@ for (i in seq_len(ceiling(nrow(expr_mat) / blk))) {
 ## 4. CPM, preprocess and z‑score FBM
 
 ```{r fbm-preprocess, message=FALSE}
-prep_alz <- preprocessPLIER2FBM(
+prep_alz <- preprocessCLAMPFBM(
     fbm = alzFBM,
     mean_cutoff = 0.5,
     var_cutoff = 0.1
@@ -357,7 +361,7 @@ prep_alz <- preprocessPLIER2FBM(
 
 alz_fbm_filt <- prep_alz$fbm_filtered
 alz_rowStats <- prep_alz$rowStats
-zscorePLIER2FBM(alz_fbm_filt, alz_rowStats)
+zscoreCLAMPFBM(alz_fbm_filt, alz_rowStats)
 alz_genes <- genes[prep_alz$kept_rows]
 ```
 
@@ -374,19 +378,19 @@ set.seed(1)
 alz_svdRes <- big_randomSVD(alz_fbm_filt, k = SVD_K_alz)
 ```
 
-## 6. Estimate K for PLIER
+## 6. Estimate K for CLAMP
 
-```{r fbm-PLIER-k, message=TRUE}
-PLIER_K_alz <- num.pc(list(d = alz_svdRes$d))
-message("Inferred PLIER K = ", PLIER_K_alz)
+```{r fbm-CLAMP-k, message=TRUE}
+CLAMP_K_alz <- num.pc(list(d = alz_svdRes$d))
+message("Inferred CLAMP K = ", CLAMP_K_alz)
 ```
 
-## 7. PLIERbase initialization
+## 7. CLAMPbase initialization
 
-```{r fbm-PLIERbase, message=FALSE}
-alz_baseRes <- PLIERbase(
+```{r fbm-CLAMPbase, message=FALSE}
+alz_baseRes <- CLAMPbase(
     Y      = alz_fbm_filt,
-    k      = PLIER_K_alz,
+    k      = CLAMP_K_alz,
     svdres = alz_svdRes,
     trace  = TRUE
 )
@@ -406,16 +410,16 @@ alz_matched <- getMatchedPathwayMat(alz_pathMat, alz_genes)
 alz_chatObj <- getChat(alz_matched)
 ```
 
-## 9. PLIERfull
+## 9. CLAMPfull
 
-```{r fbm-PLIERfull, message=FALSE}
-alz_fullRes <- PLIERfull(
+```{r fbm-CLAMPfull, message=FALSE}
+alz_fullRes <- CLAMPfull(
     Y                 = alz_fbm_filt,
     priorMat          = as.matrix(alz_matched),
     svdres            = alz_svdRes,
-    plier.base.result = alz_baseRes,
+    clamp.base.result = alz_baseRes,
     Chat              = alz_chatObj,
-    k                 = PLIER_K_alz,
+    k                 = CLAMP_K_alz,
     doCrossval        = TRUE,
     trace             = TRUE,
     max.U.updates     = 50
@@ -427,7 +431,7 @@ alz_fullRes <- PLIERfull(
 alz_summary_df <- as.data.frame(alz_fullRes$summary) %>%
     filter(FDR < 0.1 & AUC > 0.6) %>%
     arrange(FDR) %>%
-    dplyr::rename(LV = "LV index") %>%
+    dplyr::rename(LV = "LV_index") %>%
     dplyr::mutate(LV = paste0("LV", LV)) %>%
     dplyr::select(LV, pathway, FDR, AUC)
 
@@ -453,16 +457,19 @@ Aerobic Electron Transport Chain, reflecting mitochondrial function and bioenerg
 
 # Example 3: Tab-Delimited Count File (Pancreatic Islets)
 
-In this example, we apply the in‑memory PLIER2 workflow to RNA‑Seq count data from GEO accession **GSE164416** 
+In this example, we apply the in‑memory CLAMP workflow to RNA‑Seq count data from GEO accession **GSE164416** 
 (Wigger *et al.* 2021; “Multi‑omics profiling of living human pancreatic islet donors reveals heterogeneous beta-cell
 trajectories towards type 2 diabetes”, DOI: 10.1038/s42255-021-00420-9). After preprocessing the raw counts and fitting
-the PLIER2 model, we perform a differential analysis of latent‑variable activities to compare non‑diabetic (ND) and type 2
+the CLAMP model, we perform a differential analysis of latent‑variable activities to compare non‑diabetic (ND) and type 2
 diabetic (T2D) samples.
 
 ## 1. Load count data and map gene symbols
 
 ```{r islet-load, message=FALSE}
-islet_file <- system.file("extdata", "GSE164416_DP_htseq_counts.txt.gz", package = "PLIER2Data")
+# waiting for bioconductor data package
+# islet_file <- system.file("extdata", "GSE164416_DP_htseq_counts.txt.gz", package = "CLAMPData")
+
+islet_file <- here("extdata", "GSE164416_DP_htseq_counts.txt.gz")
 
 islet_df <- read.table( islet_file, header = TRUE, stringsAsFactors = FALSE ) 
 
@@ -491,7 +498,7 @@ expr <- as.matrix(expr)
 ## 3. CPM, preprocess and z-score
 
 ```{r islet-preprocess, message=FALSE}
-prep_is <- preprocessPLIER2(
+prep_is <- preprocessCLAMP(
     Y = expr,
     mean_cutoff = 0.5,
     var_cutoff = 0.1
@@ -499,7 +506,7 @@ prep_is <- preprocessPLIER2(
 
 iso_Yf <- prep_is$Y_filtered
 iso_rowS <- prep_is$rowStats
-iso_Yz <- zscorePLIER2(Y_filtered = iso_Yf, rowStats = iso_rowS)
+iso_Yz <- zscoreCLAMP(Y_filtered = iso_Yf, rowStats = iso_rowS)
 ```
 
 ## 4. SVD computation and SVD K estimation
@@ -519,19 +526,19 @@ islet_svdRes <- rsvd(
 )
 ```
 
-## 5. Estimate K for PLIER
+## 5. Estimate K for CLAMP
 
 ```{r islet-k, message=TRUE}
-PLIER_K_is <- num.pc(data = iso_Yz)
-message("Inferred PLIER k = ", PLIER_K_is)
+CLAMP_K_is <- num.pc(data = iso_Yz)
+message("Inferred CLAMP k = ", CLAMP_K_is)
 ```
 
-## 6. PLIERbase initialization
+## 6. CLAMPbase initialization
 
-```{r islet-PLIERbase, message=FALSE}
-islet_baseRes <- PLIERbase(
+```{r islet-CLAMPbase, message=FALSE}
+islet_baseRes <- CLAMPbase(
     Y      = iso_Yz,
-    k      = PLIER_K_is,
+    k      = CLAMP_K_is,
     svdres = islet_svdRes,
     trace  = TRUE
 )
@@ -551,16 +558,16 @@ islet_matched <- getMatchedPathwayMat(islet_pathMat, rownames(iso_Yz))
 islet_chatObj <- getChat(islet_matched)
 ```
 
-## 8. PLIERfull
+## 8. CLAMPfull
 
-```{r islet-PLIERfull, message=FALSE}
-islet_fullRes <- PLIERfull(
+```{r islet-CLAMPfull, message=FALSE}
+islet_fullRes <- CLAMPfull(
     Y                 = iso_Yz,
     priorMat          = as.matrix(islet_matched),
     svdres            = islet_svdRes,
-    plier.base.result = islet_baseRes,
+    clamp.base.result = islet_baseRes,
     Chat              = islet_chatObj,
-    k                 = PLIER_K_is,
+    k                 = CLAMP_K_is,
     doCrossval        = TRUE,
     trace             = TRUE,
     max.U.updates     = 50
@@ -573,7 +580,7 @@ islet_fullRes <- PLIERfull(
 islet_summary_df <- as.data.frame(islet_fullRes$summary) %>%
     filter(FDR < 0.05 & AUC > 0.7) %>%
     arrange(FDR) %>%
-    dplyr::rename(LV = "LV index") %>%
+    dplyr::rename(LV = "LV_index") %>%
     dplyr::mutate(LV = paste0("LV", LV)) %>%
     dplyr::select(LV, pathway, FDR, AUC)
 
@@ -590,7 +597,7 @@ datatable(
     formatSignif(c("AUC", "FDR"), 3)
 ```
 
-In pancreatic islet RNA‑Seq, PLIER2 latent variables robustly capture islet-specific endocrine and metabolic programs.
+In pancreatic islet RNA‑Seq, CLAMP latent variables robustly capture islet-specific endocrine and metabolic programs.
 The top latent variable aligns with the GTEx “Pancreas Female 30-39 Up” signature, confirming tissue specificity. 
 Enrichment of Myc Targets V1 and TNF‑α Signaling via NF‑κB reflects proliferative and inflammatory pathways active in islets.
 Protein Secretion and Oxidative Phosphorylation underline secretory and mitochondrial metabolic functions.
@@ -606,8 +613,11 @@ we compute average LV expression per group to identify LVs that differ between h
 B_df <- as.data.frame(as.matrix(islet_fullRes$B)) %>%
     dplyr::mutate(LV = rownames(.))
 
-islet_meta <- system.file("extdata", "islets_metadata.csv", package = "PLIER2Data")
-# 
+# waiting for bioconductor data package
+# islet_meta <- system.file("extdata", "islets_metadata.csv", package = "PLIER2Data")
+
+islet_meta <- here("extdata", "islets_metadata.csv")
+
 iselt_metadata <- read.csv(islet_meta, header = TRUE)
 
 sample_types <- iselt_metadata %>%
@@ -668,19 +678,19 @@ LV3, associated with adipose and CBP‑KO islet gene sets, suggests metabolic ad
 LV2 captures changes in α‑ versus β‑cell composition. Enrichment of pancreas-specific GTEx signatures
 (e.g., “Pancreas Female 30–39 Up”) further confirms tissue relevance of these latent variables.
 
-# Parallelization in PLIER2
+# Parallelization in CLAMP
 
-PLIER2 supports multi-core parallelization for computationally intensive operations, particularly when working with large datasets and file-backed matrices (FBMs).
+CLAMP supports multi-core parallelization for computationally intensive operations, particularly when working with large datasets and file-backed matrices (FBMs).
 The `ncores` parameter can be used in several key functions to speed up processing.
 
-The following PLIER2 functions accept an `ncores` parameter:
+The following CLAMP functions accept an `ncores` parameter:
 
-- `PLIERbase()` - Core matrix factorization
-- `PLIERfull()` - Full PLIER model with pathway integration
-- `projectPLIER()` - Project new data into existing PLIER space
-- `preprocessPLIER2FBM()` - Preprocess file-backed matrices
-- `zscorePLIER2FBM()` - Z-score file-backed matrices
-- `cpmPLIER2FBM()` - CPM normalization for file-backed matrices
+- `CLAMPbase()` - Core matrix factorization
+- `CLAMPfull()` - Full CLAMP model with pathway integration
+- `projectCLAMP()` - Project new data into existing CLAMP space
+- `preprocessCLAMPFBM()` - Preprocess file-backed matrices
+- `zscoreCLAMPFBM()` - Z-score file-backed matrices
+- `cpmCLAMPFBM()` - CPM normalization for file-backed matrices
 
 # Session Information
 

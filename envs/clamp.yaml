@@ -1,4 +1,4 @@
-name: plier2
+name: clamp
 channels:
   - conda-forge
   - bioconda
@@ -38,6 +38,9 @@ dependencies:
   - bioconductor-fgsea
   - bioconductor-org.Hs.eg.db
   - bioconductor-ensdb.hsapiens.v86
+  - bioconductor-experimenthub
+  - bioconductor-genomeinfodbdata
+  - bioconductor-bioccheck
 
   # Other R utilities
   - r-plyr
@@ -47,7 +50,11 @@ dependencies:
   - r-kernsmooth
   - r-gplots
   - r-diagrammer
-
+  - r-irlba
+  - r-ggplot2
+  - r-ggrepel
+  - r-dt
+  
   # Ensure compatible SSL and curl for hdf5r in RStudio Server
   - openssl
   - libcurl
