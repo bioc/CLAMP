@@ -1357,6 +1357,7 @@ num.pc <- function(data, method = c("elbow", "permutation"), B = 20, seed = NULL
 #' @return A numeric matrix of the same dimensions as \code{M}, winsorized per column.
 #' @export
 winsor_topk <- function(M, k) {
+  if (nrow(M) < 10 * k) return(M)
   stopifnot(is.matrix(M), is.numeric(M), k >= 1L, k <= nrow(M))
   n <- nrow(M)
   thr <- apply(M, 2L, function(x) {
