@@ -10,7 +10,7 @@ A vector of length N with levels for major cell types.
 A data.frame with columns celltype and genes.
 }
 \usage{
-data(majorCellTypes)
+majorCellTypes
 }
 \value{
 A data.frame of major cell type signatures.

@@ -6,7 +6,7 @@
 \usage{
 PLIERbase(
   Y,
-  k,
+  k = NULL,
   svdres = NULL,
   L1 = NULL,
   L2 = NULL,

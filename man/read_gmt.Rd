@@ -13,6 +13,7 @@ read_gmt(filename)
 A named list where each element is a character vector of gene names.
 }
 \description{
-Parses a local GMT file and returns a list of gene sets, with each gene set represented as
+Parses a local GMT file and returns a list of gene sets, with each gene
+set represented as
 a character vector of unique gene names.
 }
