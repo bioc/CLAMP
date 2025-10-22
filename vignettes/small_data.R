@@ -1,6 +1,6 @@
 ## ----setup, include=FALSE-----------------------------------------------------
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, cache=F)
-library(PLIER2)
+library(CLAMP)
 
 ## -----------------------------------------------------------------------------
 data("dataWholeBlood")
@@ -40,9 +40,9 @@ matchedPathsWB <- getMatchedPathwayMatList(
 set.seed(1);dataWholeBlood.svd=rsvd(dataWholeBlood)
 
 ## -----------------------------------------------------------------------------
-# Fit baseline PLIER
+# Fit baseline CLAMP
 suppressMessages({
-  wb.plier.base <- PLIERbase(
+  wb.clamp.base <- CLAMPbase(
     dataWholeBlood,
  #   k = 25,
     svdres = dataWholeBlood.svd,
@@ -52,23 +52,23 @@ suppressMessages({
 })
 
 ## -----------------------------------------------------------------------------
-# Fit variance-prior extended PLIER model
+# Fit variance-prior extended CLAMP model
 suppressMessages({
-  wb.plier.full.vp <- PLIERfullVP(
+  wb.clamp.full.vp <- CLAMPfullVP(
     dataWholeBlood,
     priorMat = matchedPathsWB,
-    plier.base.result = wb.plier.base,
+    clamp.base.result = wb.clamp.base,
     trace = TRUE, use_cpp = T
   )
 })
 
 ## ----fig.width=6, fig.height=5------------------------------------------------
 output <- compareBs(
-  wb.plier.base,
-  wb.plier.full.vp,
+  wb.clamp.base,
+  wb.clamp.full.vp,
   celltypeTargets,
-  "PLIERbase",
-  "PLIERfullVP",
+  "CLAMPbase",
+  "CLAMPfullVP",
   m = "s"
 )
 
@@ -80,10 +80,10 @@ knitr::kable(output$df, format = "markdown")
 ## -----------------------------------------------------------------------------
 dataWholeBloodFBM=bigstatsr::as_FBM(dataWholeBlood)
 suppressMessages({
-  wb.plier.full.vp.fbm <- PLIERfullVP(
+  wb.clamp.full.vp.fbm <- CLAMPfullVP(
     dataWholeBloodFBM,
     priorMat = matchedPathsWB,
-    plier.base.result = wb.plier.base,
+    clamp.base.result = wb.clamp.base,
     trace = TRUE, use_cpp = T
   )
 })
@@ -91,11 +91,11 @@ suppressMessages({
 
 ## ----fig.width=6, fig.height=5------------------------------------------------
 output <- compareBs(
-  wb.plier.base,
-  wb.plier.full.vp.fbm,
+  wb.clamp.base,
+  wb.clamp.full.vp.fbm,
   celltypeTargets,
-  "PLIERbase",
-  "PLIERfullVP",
+  "CLAMPbase",
+  "CLAMPfullVP",
   m = "s"
 )
 

@@ -6,7 +6,7 @@
 \usage{
 CLAMPbase(
   Y,
-  k = NULL,
+  k,
   svdres = NULL,
   L1 = NULL,
   L2 = NULL,

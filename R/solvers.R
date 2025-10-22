@@ -785,7 +785,7 @@ CLAMPbase <- function(
 
 #' Full CLAMP model with prior information and cross-validation
 #'
-#' Runs the full CLAMP model using a gene expression matrix
+#' Runs the full CLAMP (Compressed Latent-variable Approach for Massive data Processing) model using a gene expression matrix
 #' and prior pathway annotation matrix. This function performs latent variable decomposition
 #' guided by prior knowledge and includes optional cross-validation to evaluate pathway associations.
 #'
@@ -856,322 +856,319 @@ CLAMPbase <- function(
 #' )
 #' @export
 CLAMPfull <- function(
-        Y, priorMat, svdres = NULL, clamp.base.result = NULL, k = NULL, L1 = NULL, L2 = NULL, top = NULL,
-        cvn = 5, max.iter = 350, trace = FALSE, Chat = NULL, maxPath = 10, doCrossval = TRUE,
-        penalty.factor = rep(1, ncol(priorMat)), glm_alpha = 0.9,
-        minGenes = 10, tol = 5e-4, seed = 123456, allGenes = FALSE, rseed = NULL,
-        max.U.updates = 5, pathwaySelection = c("fast"), multiplier = 1,
-        adaptive.p = 0.05, useNNLS = TRUE, useRaw = TRUE, refitAll = FALSE, useSE = FALSE, ncores = 1) {
-    if (ncores > 1) {
-        # if we are parallelizing, then disable BLAS parallelization
-        options(bigstatsr.check.parallel.blas = FALSE)
-        blas_nproc <- getOption("default.nproc.blas")
-        options(default.nproc.blas = NULL)
-    }
-    getT <- function(x) {
-        -quantile(x[x < 0], adaptive.p)
-    }
+    Y, priorMat, svdres = NULL, clamp.base.result = NULL, k = NULL, L1 = NULL, L2 = NULL, top = NULL,
+    cvn = 5, max.iter = 350, trace = FALSE, Chat = NULL, maxPath = 10, doCrossval = TRUE,
+    penalty.factor = rep(1, ncol(priorMat)), glm_alpha = 0.9,
+    minGenes = 10, tol = 5e-4, seed = 123456, allGenes = FALSE, rseed = NULL,
+    max.U.updates = 5, pathwaySelection = c("fast"), multiplier = 1,
+    adaptive.p = 0.05, useNNLS = TRUE, useRaw = TRUE, refitAll = FALSE, useSE = FALSE, ncores = 1) {
+  if (ncores > 1) {
+    # if we are parallelizing, then disable BLAS parallelization
+    options(bigstatsr.check.parallel.blas = FALSE)
+    blas_nproc <- getOption("default.nproc.blas")
+    options(default.nproc.blas = NULL)
+  }
+  getT <- function(x) {
+    -quantile(x[x < 0], adaptive.p)
+  }
 
-    pathwaySelection <- match.arg(pathwaySelection, c("complete", "fast"))
+  pathwaySelection <- match.arg(pathwaySelection, c("complete", "fast"))
 
-    priorMat <- as.matrix(priorMat)
+  priorMat <- as.matrix(priorMat)
 
-    message("** CLAMP **")
+  message("**CLAMP v2 **")
 
-    # Detect matrix type
-    is_fbm <- inherits(Y, "FBM")
-    is_sparse <- inherits(Y, "dgCMatrix")
+  # Detect matrix type
+  is_fbm <- inherits(Y, "FBM")
+  is_sparse <- inherits(Y, "dgCMatrix")
 
-    if (nrow(priorMat) != nrow(Y) || !all(rownames(priorMat) == rownames(Y))) {
-        if (!allGenes) {
-            cm <- commonRows(Y, priorMat)
-            message("Selecting common genes: ", length(cm))
-            priorMat <- priorMat[cm, ]
-            Y <- Y[cm, ]
-        } else {
-            extra.genes <- setdiff(rownames(Y), rownames(priorMat))
-            eMat <- matrix(0, nrow = length(extra.genes), ncol = ncol(priorMat))
-            rownames(eMat) <- extra.genes
-            priorMat <- rbind(priorMat, eMat)
-            priorMat <- priorMat[rownames(Y), ]
-        }
-    }
-
-    numGenes <- Matrix::colSums(priorMat)
-
-    heldOutGenes <- list()
-    iibad <- which(numGenes < minGenes)
-    if (length(iibad) > 0) {
-        priorMat <- priorMat[, -iibad]
-        message("Removed ", length(iibad), " pathways with too few genes")
-    }
-    if (doCrossval) {
-        priorMatCV <- as.matrix(priorMat)
-        if (!is.null(seed)) {
-            warning("`seed` is deprecated and ignored. Use set.seed(seed) before calling this function.",
-                call. = FALSE
-            )
-        }
-        for (j in seq_len(ncol(priorMatCV))) {
-            iipos <- which(priorMatCV[, j] > 0)
-            iiposs <- sample(iipos, length(iipos) / 5)
-            priorMatCV[iiposs, j] <- 0
-            heldOutGenes[[colnames(priorMat)[j]]] <- rownames(priorMat)[iiposs]
-        }
-        C <- priorMatCV
+  if (nrow(priorMat) != nrow(Y) || !all(rownames(priorMat) == rownames(Y))) {
+    if (!allGenes) {
+      cm <- commonRows(Y, priorMat)
+      message("Selecting common genes: ", length(cm))
+      priorMat <- priorMat[cm, ]
+      Y <- Y[cm, ]
     } else {
-        C <- priorMat
+      extra.genes <- setdiff(rownames(Y), rownames(priorMat))
+      eMat <- matrix(0, nrow = length(extra.genes), ncol = ncol(priorMat))
+      rownames(eMat) <- extra.genes
+      priorMat <- rbind(priorMat, eMat)
+      priorMat <- priorMat[rownames(Y), ]
+    }
+  }
+
+  numGenes <- Matrix::colSums(priorMat)
+
+  heldOutGenes <- list()
+  iibad <- which(numGenes < minGenes)
+  if (length(iibad) > 0) {
+    priorMat <- priorMat[, -iibad]
+    message("Removed ", length(iibad), " pathways with too few genes")
+  }
+  if (doCrossval) {
+    priorMatCV <- as.matrix(priorMat)
+    if (!is.null(seed)) {
+      warning("`seed` is deprecated and ignored. Use set.seed(seed) before calling this function.",
+              call. = FALSE
+      )
+    }
+    for (j in seq_len(ncol(priorMatCV))) {
+      iipos <- which(priorMatCV[, j] > 0)
+      iiposs <- sample(iipos, length(iipos) / 5)
+      priorMatCV[iiposs, j] <- 0
+      heldOutGenes[[colnames(priorMat)[j]]] <- rownames(priorMat)[iiposs]
+    }
+    C <- priorMatCV
+  } else {
+    C <- priorMat
+  }
+
+  nc <- ncol(priorMat)
+  ng <- nrow(Y)
+  ns <- ncol(Y)
+
+  Bdiff <- -1
+  BdiffTrace <- double()
+  BdiffCount <- 0
+
+  # YsqSum=sum(Y^2)
+  # compute svd and use that as the starting point
+
+  if (!is.null(svdres) && nrow(svdres$v) != ncol(Y)) {
+    message("SVD V has the wrong number of columns")
+    svdres <- NULL
+  }
+  if (is.null(svdres) && is.null(clamp.base.result)) {
+    message("Computing SVD")
+    if (ns > 500) {
+      message("Using rsvd")
+
+      svdres <- rsvd(Y, k = min(ns, max(200, ns / 4)), q = 3)
+    } else {
+      svdres <- svd(Y)
+    }
+    message("Done")
+  }
+  if (is.null(clamp.base.result)) {
+    if (is.null(k)) {
+      k <- floor(sqrt(ncol(Y)))
+      k <- min(k, floor(ncol(Y) * 0.9))
+      message("k is set to ", k)
     }
 
-    nc <- ncol(priorMat)
-    ng <- nrow(Y)
-    ns <- ncol(Y)
-
-    Bdiff <- -1
-    BdiffTrace <- double()
-    BdiffCount <- 0
-    if (is.null(Chat)) {
-        Cp <- crossprod(C)
-        Chat <- pinv.ridge(crossprod(C), 5) %*% (t(C))
-    }
-    # YsqSum=sum(Y^2)
-    # compute svd and use that as the starting point
-
-    if (!is.null(svdres) && nrow(svdres$v) != ncol(Y)) {
-        message("SVD V has the wrong number of columns")
-        svdres <- NULL
-    }
-    if (is.null(svdres) && is.null(clamp.base.result)) {
-        message("Computing SVD")
-        if (ns > 500) {
-            message("Using rsvd")
-
-            svdres <- rsvd(Y, k = min(ns, max(200, ns / 4)), q = 3)
-        } else {
-            svdres <- svd(Y)
-        }
-        message("Done")
-    }
+    message("Running CLAMPbase")
     if (is.null(clamp.base.result)) {
-        if (is.null(k)) {
-            k <- floor(sqrt(ncol(Y)))
-            k <- min(k, floor(ncol(Y) * 0.9))
-            message("k is set to ", k)
+      clamp.base.result <- CLAMPbase(Y, k = k)
+    }
+  } else {
+    message("using provided CLAMPbase result")
+
+    if (nrow(Y) != nrow(clamp.base.result$Z)) {
+      if (is.null(rownames(Y)) | is.null(rownames(clamp.base.result$Z))) {
+        stop("Y and clamp.base.result$Z must have equal row numbers or row names")
+      }
+      clamp.base.result$Z <- clamp.base.result$Z[rownames(Y), ]
+    }
+    u.iter <- 2
+    k <- ncol(clamp.base.result$Z)
+  }
+
+  Z <- clamp.base.result$Z
+
+  if (is.null(L1)) {
+    L1 <- clamp.base.result$L1
+  }
+  if (is.null(L2)) {
+    L2 <- clamp.base.result$L2
+  }
+  L1 <- L1 * multiplier
+  L2 <- L2 / multiplier
+  message("L1=", L1, "; L2=", L2)
+
+  if (ncol(clamp.base.result$B) == ncol(Y)) {
+    B <- clamp.base.result$B
+  }
+
+  oldB <- B
+
+  if (!is.null(rseed)) {
+    message("Using random start")
+    # reproducibility is controlled by user calling set.seed before this function
+    B <- t(apply(B, 1, sample))
+    Z <- apply(Z, 2, sample)
+  }
+
+  U <- matrix(0, nrow = ncol(C), ncol = k)
+
+
+  round2 <- function(x) {
+    signif(x, 4)
+  }
+
+  u.iter
+
+  curfrac <- 0
+  nposlast <- Inf
+  npos <- -Inf
+  num.U.updates <- 0
+  L1k <- L1 * diag(k)
+  L2k <- L2 * diag(k)
+
+  if (is_fbm) {
+    ZYt <- big_cprodMat(Y, as.matrix(Z), ncores = ncores)
+    ZY <- Matrix::t(ZYt)
+    B <- solve(Matrix::t(Z) %*% Z + L2k) %*% ZY
+  } else {
+    B <- solve(Matrix::t(Z) %*% Z + L2k) %*% mat_mult(Matrix::t(Z), Y, ncores = ncores)
+  }
+  Zraw <- Z
+  Z2 <- matrix(0, nrow = nrow(Z), ncol = ncol(Z))
+
+  B <- as.matrix(B)
+
+  for (iter in seq_len(max.iter)) {
+    if (iter >= u.iter) { #actually do a U iteration
+      if (num.U.updates < max.U.updates & iter %% 2 == 1) {
+        #  Updating U
+        if (any(Zraw < 0)) {
+          stop()
+        }
+        if (refitAll || num.U.updates %% 5 == 0) {
+          Uprev <- NULL
+          #  mRefitting all U coefficinets
+        } else {
+          Uprev <- U
         }
 
-        message("Running CLAMPbase")
-        if (is.null(clamp.base.result)) {
-            clamp.base.result <- CLAMPbase(Y, k = k)
+        if (useRaw) {
+          res <- solveU(Zraw, Chat, C, penalty.factor, pathwaySelection,
+                        glm_alpha, maxPath,
+                        binary = FALSE, nfolds = cvn, top = top,
+                        useNNLS = useNNLS, Uprev = Uprev, useSE = useSE
+          )
+        } else {
+          res <- solveU(Z, Chat, C, penalty.factor, pathwaySelection,
+                        glm_alpha, maxPath,
+                        binary = FALSE, nfolds = cvn, top = top,
+                        useNNLS = useNNLS, Uprev = Uprev, useSE = useSE
+          )
         }
+        U <- res$U
+
+        num.U.updates <- num.U.updates + 1
+
+        iter.full <- iter.full + iter.full.start
+
+
+        Z2 <- L1 * C %*% U
+      }
+
+      curfrac <- (npos <- sum(apply(U, 2, max) > 0)) / k
+      # Z1=Y%*%t(B)
+      Z1 <- mat_mult(Y, t(B), ncores = ncores)
+
+      # ii=which(Z2>0)
+      # ratio=median(Z2[ii]/abs(Z1[ii]))
+
+      Z <- (Z1 + Z2) %*% solve(tcrossprod(B) + L1k)
     } else {
-        message("using provided CLAMPbase result")
-
-        if (nrow(Y) != nrow(clamp.base.result$Z)) {
-            if (is.null(rownames(Y)) | is.null(rownames(clamp.base.result$Z))) {
-                stop("Y and clamp.base.result$Z must have equal row numbers or row names")
-            }
-            clamp.base.result$Z <- clamp.base.result$Z[rownames(Y), ]
-        }
-        u.iter <- 2
-        k <- ncol(clamp.base.result$Z)
+      Z <- mat_mult(Y, t(B), ncores = ncores) %*% solve(tcrossprod(B) + L1k)
     }
 
-    Z <- clamp.base.result$Z
+    if (adaptive.p > 0) {
+      Zraw <- Z
+      Zraw[Zraw < 0] <- 0
+      cutoffs <- apply(Z, 2, getT)
 
-    if (is.null(L1)) {
-        L1 <- clamp.base.result$L1
-    }
-    if (is.null(L2)) {
-        L2 <- clamp.base.result$L2
-    }
-    L1 <- L1 * multiplier
-    L2 <- L2 / multiplier
-    message("L1=", L1, "; L2=", L2)
-
-    if (ncol(clamp.base.result$B) == ncol(Y)) {
-        B <- clamp.base.result$B
+      for (j in seq_len(ncol(Z))) {
+        Z[Z[, j] < cutoffs[j], j] <- 0
+      }
+    } else {
+      Z[Z < 0] <- 0
+      Zraw <- Z
     }
 
     oldB <- B
 
-    if (!is.null(rseed)) {
-        message("Using random start")
-        # reproducibility is controlled by user calling set.seed before this function
-        B <- t(apply(B, 1, sample))
-        Z <- apply(Z, 2, sample)
-    }
-
-    U <- matrix(0, nrow = ncol(C), ncol = k)
-
-
-    round2 <- function(x) {
-        signif(x, 4)
-    }
-
-    iter.full.start <- iter.full <- u.iter
-
-    curfrac <- 0
-    nposlast <- Inf
-    npos <- -Inf
-    num.U.updates <- 0
-    L1k <- L1 * diag(k)
-    L2k <- L2 * diag(k)
-
     if (is_fbm) {
-        ZYt <- big_cprodMat(Y, as.matrix(Z), ncores = ncores)
-        ZY <- Matrix::t(ZYt)
-        B <- solve(Matrix::t(Z) %*% Z + L2k) %*% ZY
+      ZYt <- big_cprodMat(Y, as.matrix(Z), ncores = ncores)
+      ZY <- Matrix::t(ZYt)
+      B <- solve(Matrix::t(Z) %*% Z + L2k) %*% ZY
     } else {
-        B <- solve(Matrix::t(Z) %*% Z + L2k) %*% mat_mult(Matrix::t(Z), Y, ncores = ncores)
-    }
-    Zraw <- Z
-    Z2 <- matrix(0, nrow = nrow(Z), ncol = ncol(Z))
-
-    B <- as.matrix(B)
-
-    for (iter in seq_len(max.iter)) {
-        if (iter >= iter.full.start) {
-            if (iter >= iter.full && num.U.updates < max.U.updates & iter %% 2 == 1) {
-                #  Updating U
-                if (any(Zraw < 0)) {
-                    stop()
-                }
-                if (refitAll || num.U.updates %% 5 == 0) {
-                    Uprev <- NULL
-                    #  mRefitting all U coefficinets
-                } else {
-                    Uprev <- U
-                }
-
-                if (useRaw) {
-                    res <- solveU(Zraw, Chat, C, penalty.factor, pathwaySelection,
-                        glm_alpha, maxPath,
-                        binary = FALSE, nfolds = cvn, top = top,
-                        useNNLS = useNNLS, Uprev = Uprev, useSE = useSE
-                    )
-                } else {
-                    res <- solveU(Z, Chat, C, penalty.factor, pathwaySelection,
-                        glm_alpha, maxPath,
-                        binary = FALSE, nfolds = cvn, top = top,
-                        useNNLS = useNNLS, Uprev = Uprev, useSE = useSE
-                    )
-                }
-                U <- res$U
-
-                num.U.updates <- num.U.updates + 1
-
-                iter.full <- iter.full + iter.full.start
-
-
-                Z2 <- L1 * C %*% U
-            }
-
-            curfrac <- (npos <- sum(apply(U, 2, max) > 0)) / k
-            # Z1=Y%*%t(B)
-            Z1 <- mat_mult(Y, t(B), ncores = ncores)
-
-            # ii=which(Z2>0)
-            # ratio=median(Z2[ii]/abs(Z1[ii]))
-
-            Z <- (Z1 + Z2) %*% solve(tcrossprod(B) + L1k)
-        } else {
-            Z <- mat_mult(Y, t(B), ncores = ncores) %*% solve(tcrossprod(B) + L1k)
-        }
-
-        if (adaptive.p > 0) {
-            Zraw <- Z
-            Zraw[Zraw < 0] <- 0
-            cutoffs <- apply(Z, 2, getT)
-
-            for (j in seq_len(ncol(Z))) {
-                Z[Z[, j] < cutoffs[j], j] <- 0
-            }
-        } else {
-            Z[Z < 0] <- 0
-            Zraw <- Z
-        }
-
-        oldB <- B
-
-        if (is_fbm) {
-            ZYt <- big_cprodMat(Y, as.matrix(Z), ncores = ncores)
-            ZY <- Matrix::t(ZYt)
-            B <- solve(Matrix::t(Z) %*% Z + L2k) %*% ZY
-        } else {
-            Z_mat <- if (inherits(Z, "matrix")) Z else as.matrix(Z)
-            B <- solve(Matrix::t(Z_mat) %*% Z + L2k) %*% mat_mult(Matrix::t(Z), Y, ncores = ncores)
-        }
-
-        Bdiff <- sum((B - oldB)^2) / sum(B^2)
-        minCor <- min(row_cor(B, oldB))
-
-        BdiffTrace <- c(BdiffTrace, Bdiff)
-
-        if (trace) {
-            message(sprintf("\rProgress %d / %d | Bdiff=%.6f", iter, max.iter, Bdiff))
-            flush.console()
-        }
-
-        if (iter > 52 && Bdiff > BdiffTrace[iter - 50]) {
-            BdiffCount <- BdiffCount + 1
-            # message("Bdiff is not decreasing")
-        } else if (BdiffCount > 1) {
-            BdiffCount <- BdiffCount - 1
-        }
-
-        if (Bdiff < tol & iter > u.iter + num.U.updates * 2 + 5) {
-            message(sprintf(
-                "\rConverged at %d / %d | Bdiff=%.6f, minCor=%.6f\n", iter, max.iter,
-                Bdiff, minCor
-            ))
-            break
-        }
-        if (BdiffCount > 5) {
-            message("converged at iteration", iter, "Bdiff is not decreasing")
-            break
-        }
-    }
-    rownames(U) <- colnames(priorMat)
-    colnames(U) <- rownames(B) <- paste0("LV", seq_len(k))
-
-    out <- list(B = B, Z = Z, U = U, C = C, L1 = L1, L2 = L2, heldOutGenes = heldOutGenes)
-
-    if (doCrossval) {
-        if (adaptive.p != 0) {
-            message("Updating Z for CV")
-            out$Z <- Zraw
-            out$Z[out$Z < 0] <- 0
-        }
-        message("crossValidation")
-        priorMat_m <- as.matrix(priorMat)
-        priorMatCV_m <- as.matrix(priorMatCV)
-        outAUC <- crossVal(out, priorMat, priorMatCV)
-        out$Z <- Z
-        out$Uauc <- outAUC$Uauc
-        out$Up <- outAUC$Upval
-        out$summary <- outAUC$summary
-        out$priorMatCV <- priorMatCV
-        out$priorMat <- priorMat
-        out$withPrior <- which(colSums(out$U) > 0)
-
-        tt <- apply(out$Uauc, 2, max)
-        message("There are ", sum(tt > 0.70), " LVs with AUC>0.70")
-        message("There are ", sum(tt > 0.90), " LVs with AUC>0.90")
-    } else {
-        message("Not using cross-validation. No AUCs or p-values")
+      Z_mat <- if (inherits(Z, "matrix")) Z else as.matrix(Z)
+      B <- solve(Matrix::t(Z_mat) %*% Z + L2k) %*% mat_mult(Matrix::t(Z), Y, ncores = ncores)
     }
 
-    # currently not working
-    # rownames(out$B)=nameB(out)
-    out$call <- call <- match.call()
+    Bdiff <- sum((B - oldB)^2) / sum(B^2)
+    minCor <- min(row_cor(B, oldB))
 
-    if (ncores > 1) {
-        # restore previous state
-        options(bigstatsr.check.parallel.blas = TRUE)
-        options(default.nproc.blas = blas_nproc)
+    BdiffTrace <- c(BdiffTrace, Bdiff)
+
+    if (trace) {
+      message(sprintf("\rProgress %d / %d | Bdiff=%.6f", iter, max.iter, Bdiff))
+      flush.console()
     }
 
-    return(out)
+    if (iter > 52 && Bdiff > BdiffTrace[iter - 50]) {
+      BdiffCount <- BdiffCount + 1
+      # message("Bdiff is not decreasing")
+    } else if (BdiffCount > 1) {
+      BdiffCount <- BdiffCount - 1
+    }
+
+    if (Bdiff < tol & iter > u.iter + num.U.updates * 2 + 5) {
+      message(sprintf(
+        "\rConverged at %d / %d | Bdiff=%.6f, minCor=%.6f\n", iter, max.iter,
+        Bdiff, minCor
+      ))
+      break
+    }
+    if (BdiffCount > 5) {
+      message("converged at iteration", iter, "Bdiff is not decreasing")
+      break
+    }
+  }
+  rownames(U) <- colnames(priorMat)
+  colnames(U) <- rownames(B) <- paste0("LV", seq_len(k))
+
+  out <- list(B = B, Z = Z, U = U, C = C, L1 = L1, L2 = L2, heldOutGenes = heldOutGenes)
+
+  if (doCrossval) {
+    if (adaptive.p != 0) {
+      message("Updating Z for CV")
+      out$Z <- Zraw
+      out$Z[out$Z < 0] <- 0
+    }
+    message("crossValidation")
+    priorMat_m <- as.matrix(priorMat)
+    priorMatCV_m <- as.matrix(priorMatCV)
+    outAUC <- crossVal(out, priorMat, priorMatCV)
+    out$Z <- Z
+    out$Uauc <- outAUC$Uauc
+    out$Up <- outAUC$Upval
+    out$summary <- outAUC$summary
+    out$priorMatCV <- priorMatCV
+    out$priorMat <- priorMat
+    out$withPrior <- which(colSums(out$U) > 0)
+
+    tt <- apply(out$Uauc, 2, max)
+    message("There are ", sum(tt > 0.70), " LVs with AUC>0.70")
+    message("There are ", sum(tt > 0.90), " LVs with AUC>0.90")
+  } else {
+    message("Not using cross-validation. No AUCs or p-values")
+  }
+
+  # currently not working
+  # rownames(out$B)=nameB(out)
+  out$call <- call <- match.call()
+
+  if (ncores > 1) {
+    # restore previous state
+    options(bigstatsr.check.parallel.blas = TRUE)
+    options(default.nproc.blas = blas_nproc)
+  }
+
+  return(out)
 }
 
 #' Project new data into CLAMP latent space
@@ -1401,11 +1398,11 @@ ridge_B <- function(Y, Z, L2k) {
 }
 
 
-#' Runs the streamlined full PLIER (Pathway-Level Information ExtractoR) model.
+#' Runs the streamlined full CLAMP (Compressed Latent-variable Approach for Massive data Processing) model.
 #'
 #' This version performs latent-variable decomposition of a gene expression matrix \code{Y}
 #' guided by prior pathway annotations \code{priorMat}, with simplified and lighter regularization
-#' compared to the original extended PLIER variant. The algorithm alternates updates of \code{Z},
+#' compared to the original extended CLAMP variant. The algorithm alternates updates of \code{Z},
 #' \code{B}, and \code{U}, where \code{U} captures pathway–latent variable associations inferred
 #' directly from the data without ridge-regularized projections (\code{Chat} is not used).
 #'
@@ -1418,10 +1415,10 @@ ridge_B <- function(Y, Z, L2k) {
 #' @param priorMat Binary or weighted prior matrix (genes × pathways) linking genes to pathways.
 #' @param Chat Ignored in this version (kept for interface compatibility).
 #' @param svdres Optional precomputed SVD result for initialization.
-#' @param plier.base.result Optional result from \code{PLIERbase()} providing initial values.
+#' @param clamp.base.result Optional result from \code{CLAMPbase()} providing initial values.
 #' @param k Number of latent variables. Estimated from data if \code{NULL}.
 #' @param L1,L2 Regularization parameters for \code{Z} and \code{B}. Defaults use values from
-#'   \code{plier.base.result}.
+#'   \code{clamp.base.result}.
 #' @param cvn Number of folds for pathway-level cross-validation. Default: 5.
 #' @param max.iter Maximum number of outer iterations. Default: 30.
 #' @param trace Logical; print iteration progress. Default: \code{TRUE}.
@@ -1463,19 +1460,19 @@ ridge_B <- function(Y, Z, L2k) {
 #' @details
 #' This implementation omits ridge-projected priors (\code{Chat}) and uses a lighter variance prior
 #' with a lower default \code{multiplier = 5}, allowing more flexible latent representations.
-#' Setting \code{var.prior = FALSE} reproduces standard PLIER-like updates. Cross-validation, if
+#' Setting \code{var.prior = FALSE} reproduces standard CLAMP-like updates. Cross-validation, if
 #' enabled, masks 20% of gene–pathway associations per column to estimate pathway–LV specificity
 #' (reported via AUC and p-values).
 #'
 #' @examples
 #' mat <- matrix(rnorm(100), 10, 10)
-#' base <- PLIERbase(mat, k = 5)
+#' base <- CLAMPbase(mat, k = 5)
 #' prior <- matrix(sample(0:1, 40, TRUE), 10, 4)
-#' fit <- PLIERfullVP(Y = mat, priorMat = prior, plier.base.result = base,
+#' fit <- CLAMPfullVP(Y = mat, priorMat = prior, clamp.base.result = base,
 #'                    doCrossval = FALSE, trace = FALSE)
 #' @export
-PLIERfullVP <- function(
-    Y, priorMat, Chat=NULL,svdres = NULL, plier.base.result = NULL, k = NULL, L1 = NULL, L2 = NULL,
+CLAMPfullVP <- function(
+    Y, priorMat, Chat=NULL,svdres = NULL, clamp.base.result = NULL, k = NULL, L1 = NULL, L2 = NULL,
     cvn = 5, max.iter = 30, trace = TRUE,  maxPath = 10, doCrossval = TRUE,
     penalty.factor = rep(1, ncol(priorMat)), glm_alpha = 0.9,
     minGenes = 0, tol = 5e-4, seed = 123456, allGenes = FALSE, rseed = NULL,
@@ -1487,7 +1484,7 @@ PLIERfullVP <- function(
   pathwaySelection <- match.arg(pathwaySelection, c("fast", "complete"))
   priorMat <- as.matrix(priorMat)
 
-  message("** PLIER full VP final **")
+  message("** CLAMP full VP final **")
 
   ## Detect matrix type (FBM block preserved for compatibility)
   is_fbm <- inherits(Y, "FBM")
@@ -1573,7 +1570,7 @@ PLIERfullVP <- function(
     message("SVD V has the wrong number of columns; ignoring provided svdres")
     svdres <- NULL
   }
-  if (is.null(svdres) && is.null(plier.base.result)) {
+  if (is.null(svdres) && is.null(clamp.base.result)) {
     message("Computing SVD")
     if (ns > 500) {
       svdres <- rsvd::rsvd(Y, k = min(ns, max(200, ns / 4)), q = 3)
@@ -1582,37 +1579,37 @@ PLIERfullVP <- function(
     }
     message("Done")
   }
-  if (is.null(plier.base.result)) {
+  if (is.null(clamp.base.result)) {
     if (is.null(k)) {
       k <- floor(sqrt(ncol(Y)))
       k <- min(k, floor(ncol(Y) * 0.9))
       message("k is set to ", k)
     }
-    message("Running PLIERbase")
-    plier.base.result <- PLIERbase(Y, k = k)
+    message("Running CLAMPbase")
+    clamp.base.result <- CLAMPbase(Y, k = k)
     u.iter <- 2
   } else {
-    message("Using provided PLIERbase result")
-    if (nrow(Y) != nrow(plier.base.result$Z)) {
-      if (is.null(rownames(Y)) || is.null(rownames(plier.base.result$Z))) {
-        stop("Y and plier.base.result$Z must have equal row numbers or matching rownames")
+    message("Using provided CLAMPbase result")
+    if (nrow(Y) != nrow(clamp.base.result$Z)) {
+      if (is.null(rownames(Y)) || is.null(rownames(clamp.base.result$Z))) {
+        stop("Y and clamp.base.result$Z must have equal row numbers or matching rownames")
       }
-      plier.base.result$Z <- plier.base.result$Z[rownames(Y), , drop = FALSE]
+      clamp.base.result$Z <- clamp.base.result$Z[rownames(Y), , drop = FALSE]
     }
     u.iter <- 2
-    k <- ncol(plier.base.result$Z)
+    k <- ncol(clamp.base.result$Z)
   }
 
-  Z <- plier.base.result$Z
-  if (is.null(L1)) L1 <- plier.base.result$L1
-  if (is.null(L2)) L2 <- plier.base.result$L2
+  Z <- clamp.base.result$Z
+  if (is.null(L1)) L1 <- clamp.base.result$L1
+  if (is.null(L2)) L2 <- clamp.base.result$L2
   message(paste0("L1=", L1, "; L2=", L2))
 
-  if (ncol(plier.base.result$B) == ncol(Y)) {
-    B <- plier.base.result$B
+  if (ncol(clamp.base.result$B) == ncol(Y)) {
+    B <- clamp.base.result$B
     L1scalevec <- rowSums(B^2)
   } else {
-    stop("plier.base.result$B does not match number of samples in Y")
+    stop("clamp.base.result$B does not match number of samples in Y")
   }
 
   if (!is.null(rseed)) {

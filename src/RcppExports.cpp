@@ -13,7 +13,7 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 
 // updateZcpp
 void updateZcpp(SEXP ZSEXP, SEXP YSEXP, SEXP BSEXP, SEXP B2SEXP, const arma::vec& bk2_all, SEXP YBtSEXP, SEXP QSEXP, SEXP ZmultiplierSEXP, double L1, double multiplier, int inner_iter, int iter, bool Y_is_fbm, int n, int p);
-RcppExport SEXP _PLIER2_updateZcpp(SEXP ZSEXPSEXP, SEXP YSEXPSEXP, SEXP BSEXPSEXP, SEXP B2SEXPSEXP, SEXP bk2_allSEXP, SEXP YBtSEXPSEXP, SEXP QSEXPSEXP, SEXP ZmultiplierSEXPSEXP, SEXP L1SEXP, SEXP multiplierSEXP, SEXP inner_iterSEXP, SEXP iterSEXP, SEXP Y_is_fbmSEXP, SEXP nSEXP, SEXP pSEXP) {
+RcppExport SEXP _CLAMP_updateZcpp(SEXP ZSEXPSEXP, SEXP YSEXPSEXP, SEXP BSEXPSEXP, SEXP B2SEXPSEXP, SEXP bk2_allSEXP, SEXP YBtSEXPSEXP, SEXP QSEXPSEXP, SEXP ZmultiplierSEXPSEXP, SEXP L1SEXP, SEXP multiplierSEXP, SEXP inner_iterSEXP, SEXP iterSEXP, SEXP Y_is_fbmSEXP, SEXP nSEXP, SEXP pSEXP) {
 BEGIN_RCPP
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< SEXP >::type ZSEXP(ZSEXPSEXP);
@@ -37,7 +37,7 @@ END_RCPP
 }
 // updateZcppOld
 void updateZcppOld(arma::mat& Z, const arma::mat& Y, const arma::mat& B, const arma::mat& B2, const arma::vec& bk2_all, const arma::mat& YBt, arma::mat& Q, const arma::mat& Zmultiplier, double L1, double multiplier, int inner_iter, int iter);
-RcppExport SEXP _PLIER2_updateZcppOld(SEXP ZSEXP, SEXP YSEXP, SEXP BSEXP, SEXP B2SEXP, SEXP bk2_allSEXP, SEXP YBtSEXP, SEXP QSEXP, SEXP ZmultiplierSEXP, SEXP L1SEXP, SEXP multiplierSEXP, SEXP inner_iterSEXP, SEXP iterSEXP) {
+RcppExport SEXP _CLAMP_updateZcppOld(SEXP ZSEXP, SEXP YSEXP, SEXP BSEXP, SEXP B2SEXP, SEXP bk2_allSEXP, SEXP YBtSEXP, SEXP QSEXP, SEXP ZmultiplierSEXP, SEXP L1SEXP, SEXP multiplierSEXP, SEXP inner_iterSEXP, SEXP iterSEXP) {
 BEGIN_RCPP
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< arma::mat& >::type Z(ZSEXP);
@@ -58,12 +58,12 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_PLIER2_updateZcpp", (DL_FUNC) &_PLIER2_updateZcpp, 15},
-    {"_PLIER2_updateZcppOld", (DL_FUNC) &_PLIER2_updateZcppOld, 12},
+    {"_CLAMP_updateZcpp", (DL_FUNC) &_CLAMP_updateZcpp, 15},
+    {"_CLAMP_updateZcppOld", (DL_FUNC) &_CLAMP_updateZcppOld, 12},
     {NULL, NULL, 0}
 };
 
-RcppExport void R_init_PLIER2(DllInfo *dll) {
+RcppExport void R_init_CLAMP(DllInfo *dll) {
     R_registerRoutines(dll, NULL, CallEntries, NULL, NULL);
     R_useDynamicSymbols(dll, FALSE);
 }

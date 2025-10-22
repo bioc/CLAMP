@@ -5,7 +5,7 @@
 \title{ComplexHeatmap visualization of top genes by latent variable}
 \usage{
 plotTopZ_Complex(
-  plierRes,
+  clampRes,
   data,
   priorMat,
   top = 10,
@@ -20,7 +20,7 @@ plotTopZ_Complex(
 )
 }
 \arguments{
-\item{plierRes}{A PLIER result list containing matrices \code{Z}, \code{U}, etc.}
+\item{clampRes}{A CLAMP result list containing matrices \code{Z}, \code{U}, etc.}
 
 \item{data}{Expression matrix with genes as rows.}
 
@@ -53,7 +53,7 @@ and optionally Z-loadings for top genes per LV using ComplexHeatmap.
 }
 \examples{
 \dontrun{
-plotTopZ_Complex(plierRes, expr_data, priorMat, top = 15, index = 1:5, Zheat = TRUE)
+plotTopZ_Complex(clampRes, expr_data, priorMat, top = 15, index = 1:5, Zheat = TRUE)
 }
 
 }

@@ -161,7 +161,7 @@ oneToOneMask <- function(cc) {
 #' Produces a combined heatmap showing expression, pathway membership,
 #' and optionally Z-loadings for top genes per LV using ComplexHeatmap.
 #'
-#' @param plierRes A PLIER result list containing matrices \code{Z}, \code{U}, etc.
+#' @param clampRes A CLAMP result list containing matrices \code{Z}, \code{U}, etc.
 #' @param data Expression matrix with genes as rows.
 #' @param priorMat Binary gene × pathway matrix.
 #' @param top Integer, number of top genes per LV.
@@ -178,7 +178,7 @@ oneToOneMask <- function(cc) {
 #'
 #' @examples
 #' \dontrun{
-#' plotTopZ_Complex(plierRes, expr_data, priorMat, top = 15, index = 1:5, Zheat = TRUE)
+#' plotTopZ_Complex(clampRes, expr_data, priorMat, top = 15, index = 1:5, Zheat = TRUE)
 #' }
 #'
 #' @import ComplexHeatmap
@@ -186,11 +186,11 @@ oneToOneMask <- function(cc) {
 #' @importFrom stats setNames
 #' @importFrom Matrix rowSums
 #' @export
-plotTopZ_Complex <- function(plierRes, data, priorMat, top = 10, top.pathway = 5,
+plotTopZ_Complex <- function(clampRes, data, priorMat, top = 10, top.pathway = 5,
                              index = NULL, allLVs = FALSE, Zheat = FALSE,
                              LV.names = NULL, max.genes = 100, max.col = 50, seed = 1234) {
 
-  data <- data[rownames(plierRes$Z), , drop = FALSE]
+  data <- data[rownames(clampRes$Z), , drop = FALSE]
   if (top * length(index) > max.genes)
     stop("Too many genes. Reduce number of LVs or 'top', or increase 'max.genes'.")
 
@@ -199,22 +199,22 @@ plotTopZ_Complex <- function(plierRes, data, priorMat, top = 10, top.pathway = 5
     data <- data[, sample(ncol(data), max.col)]
   }
 
-  priorMat <- priorMat[rownames(plierRes$Z), , drop = FALSE]
-  ii <- which(colSums(plierRes$U) > 0)
+  priorMat <- priorMat[rownames(clampRes$Z), , drop = FALSE]
+  ii <- which(colSums(clampRes$U) > 0)
   if (!allLVs) {
     if (!is.null(index)) ii <- intersect(ii, index)
   } else {
     ii <- index
   }
 
-  tmp <- apply(-plierRes$Z[, ii, drop = FALSE], 2, rank)
+  tmp <- apply(-clampRes$Z[, ii, drop = FALSE], 2, rank)
   nn <- unique(unlist(apply(tmp, 2, function(x) names(which(x <= top)))))
   nn <- sort(unique(nn))
   data_sub <- t(scale(t(data[nn, , drop = FALSE])))
 
   nnpath <- sapply(seq_along(ii), function(i) {
     gene_idx <- match(nn, rownames(priorMat))
-    col_idx <- which(plierRes$U[, ii[i]] > 0)
+    col_idx <- which(clampRes$U[, ii[i]] > 0)
     Matrix::rowSums(priorMat[gene_idx, col_idx, drop = FALSE]) > 0
   })
   nnpath <- rowSums(nnpath) > 0
@@ -224,7 +224,7 @@ plotTopZ_Complex <- function(plierRes, data, priorMat, top = 10, top.pathway = 5
   )
 
   top_pathways <- unique(unlist(lapply(ii, function(i)
-    names(sort(plierRes$U[, i], decreasing = TRUE))[seq_len(top.pathway)])))
+    names(sort(clampRes$U[, i], decreasing = TRUE))[seq_len(top.pathway)])))
   gene_idx <- match(nn, rownames(priorMat))
   path_idx <- match(top_pathways, colnames(priorMat))
   pathway_mat <- priorMat[gene_idx, path_idx, drop = FALSE]
@@ -251,8 +251,8 @@ plotTopZ_Complex <- function(plierRes, data, priorMat, top = 10, top.pathway = 5
   )
 
   if (Zheat) {
-    gene_idx <- match(nn, rownames(plierRes$Z))
-    z_sub <- scale(plierRes$Z[gene_idx, index, drop = FALSE], center = FALSE)
+    gene_idx <- match(nn, rownames(clampRes$Z))
+    z_sub <- scale(clampRes$Z[gene_idx, index, drop = FALSE], center = FALSE)
     if (!is.null(LV.names)) colnames(z_sub) <- LV.names[index]
     z_col_fun <- circlize::colorRamp2(c(0, max(z_sub, na.rm = TRUE)),
                                       c("#e5f5e0", "#31a354"))
@@ -265,8 +265,8 @@ plotTopZ_Complex <- function(plierRes, data, priorMat, top = 10, top.pathway = 5
     )
   }
 
-  lv_labels <- colnames(plierRes$Z)[max.col(scale(plierRes$Z, center = FALSE), ties.method = "first")]
-  names(lv_labels) <- rownames(plierRes$Z)
+  lv_labels <- colnames(clampRes$Z)[max.col(scale(clampRes$Z, center = FALSE), ties.method = "first")]
+  names(lv_labels) <- rownames(clampRes$Z)
   gene_lv <- lv_labels[rownames(data_sub)]
   row_annot <- ComplexHeatmap::rowAnnotation(LV = gene_lv, show_annotation_name = FALSE)
 

@@ -324,14 +324,7 @@ RAM—using the `cpmCLAMPFBM()` function from **CLAMP**:
 ## 2. Load HDF5 expression
 
 ```{r hdf5-load, message=FALSE}
-<<<<<<< HEAD
-# waiting for bioconductor data package
-# alz_path <- system.file("extdata", "human_gene_v2.5_alz.h5", package = "CLAMPData")
-
-alz_path <- here("extdata", "human_gene_v2.5_alz.h5")
-=======
 alz_path <- system.file("extdata", "human_gene_v2.5_alz.h5", package = "CLAMPData")
->>>>>>> 4a6a32006624b942c847becd71f73baf7dedfed6
 h5 <- H5File$new(alz_path, mode = "r")
 expr_mat <- t(h5[["data/expression"]]$read())
 genes <- h5[["meta/genes/symbol"]]$read()
@@ -470,14 +463,7 @@ diabetic (T2D) samples.
 ## 1. Load count data and map gene symbols
 
 ```{r islet-load, message=FALSE}
-<<<<<<< HEAD
-# waiting for bioconductor data package
-# islet_file <- system.file("extdata", "GSE164416_DP_htseq_counts.txt.gz", package = "CLAMPData")
-
-islet_file <- here("extdata", "GSE164416_DP_htseq_counts.txt.gz")
-=======
 islet_file <- system.file("extdata", "GSE164416_DP_htseq_counts.txt.gz", package = "CLAMPData")
->>>>>>> 4a6a32006624b942c847becd71f73baf7dedfed6
 
 islet_df <- read.table( islet_file, header = TRUE, stringsAsFactors = FALSE ) 
 
@@ -622,7 +608,7 @@ B_df <- as.data.frame(as.matrix(islet_fullRes$B)) %>%
     dplyr::mutate(LV = rownames(.))
 
 # waiting for bioconductor data package
-# islet_meta <- system.file("extdata", "islets_metadata.csv", package = "PLIER2Data")
+# islet_meta <- system.file("extdata", "islets_metadata.csv", package = "CLAMPData")
 
 islet_meta <- here("extdata", "islets_metadata.csv")
 
