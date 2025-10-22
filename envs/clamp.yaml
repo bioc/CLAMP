@@ -41,6 +41,7 @@ dependencies:
   - bioconductor-experimenthub
   - bioconductor-genomeinfodbdata
   - bioconductor-bioccheck
+  - bioconductor-complexheatmap
 
   # Other R utilities
   - r-plyr
@@ -54,7 +55,7 @@ dependencies:
   - r-ggplot2
   - r-ggrepel
   - r-dt
-  
+  - r-circlize
   # Ensure compatible SSL and curl for hdf5r in RStudio Server
   - openssl
   - libcurl

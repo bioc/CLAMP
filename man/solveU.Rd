@@ -20,6 +20,8 @@ solveU(
   scale = TRUE,
   refit = TRUE,
   Uprev = NULL,
+  useAUC = T,
+  intercept = T,
   ...
 )
 }

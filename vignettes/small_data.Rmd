@@ -1,0 +1,137 @@
+---
+title: "Small Data Example"
+author: "Generated Report"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Small Data Example}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, cache=F)
+library(CLAMP)
+
+```
+
+## 1. Load Data and Normalize
+
+```{r}
+data("dataWholeBlood")
+data("majorCellTypes")
+
+# Scale each gene to mean 0 and variance 1
+dataWholeBlood <- tscale(dataWholeBlood)
+```
+
+## 2. Load Prior Knowledge Matrices
+
+```{r}
+# Download pathway and cell marker libraries from Enrichr
+gmtList <- list(
+  CellMarkers = getGMT(
+    "https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=CellMarker_2024",
+    "CellMarker_2024"
+  ),
+  KEGG = getGMT(
+    "https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=KEGG_2021_Human",
+    "KEGG_2021_Human"
+  )
+)
+
+# Combine into a single sparse matrix
+pathMatCell <- gmtListToSparseMat(gmtList)
+
+# Load additional xCell reference matrix
+data("xCell")
+
+# Match pathways to the gene space of whole blood
+matchedPathsWB <- getMatchedPathwayMatList(
+  pathMatCell, xCell,
+  new.genes = rownames(dataWholeBlood),
+  min.genes = 2
+)
+```
+
+## 3. Initialize Model with SVD
+
+```{r}
+# Compute truncated SVD for initialization
+set.seed(1);dataWholeBlood.svd=rsvd::rsvd(dataWholeBlood)
+```
+
+## 4. Fit Baseline and Extended CLAMP Models
+
+```{r}
+# Fit baseline CLAMP
+suppressMessages({
+  wb.clamp.base <- CLAMPbase(
+    dataWholeBlood,
+ #   k = 25,
+    svdres = dataWholeBlood.svd,
+    trace = FALSE,
+    adaptive.p = 0.05
+  )
+})
+```
+```{r}
+# Fit variance-prior extended CLAMP model
+suppressMessages({
+  wb.clamp.full.vp <- CLAMPfullVP(
+    dataWholeBlood,
+    priorMat = matchedPathsWB,
+    clamp.base.result = wb.clamp.base,
+    trace = TRUE, use_cpp = T
+  )
+})
+```
+
+## 5. Compare Models
+
+```{r fig.width=6, fig.height=5}
+output <- compareBs(
+  wb.clamp.base,
+  wb.clamp.full.vp,
+  celltypeTargets,
+  "CLAMPbase",
+  "CLAMPfullVP",
+  m = "s"
+)
+
+output$plot
+```
+
+## 6. Model Comparison Summary
+
+```{r}
+knitr::kable(output$df, format = "markdown")
+```
+
+## 7. Test FBM functionality
+```{r}
+dataWholeBloodFBM=bigstatsr::as_FBM(dataWholeBlood)
+suppressMessages({
+  wb.clamp.full.vp.fbm <- CLAMPfullVP(
+    dataWholeBloodFBM,
+    priorMat = matchedPathsWB,
+    clamp.base.result = wb.clamp.base,
+    trace = TRUE, use_cpp = T
+  )
+})
+
+```
+
+Results are the same!
+
+```{r fig.width=6, fig.height=5}
+output <- compareBs(
+  wb.clamp.base,
+  wb.clamp.full.vp.fbm,
+  celltypeTargets,
+  "CLAMPbase",
+  "CLAMPfullVP",
+  m = "s"
+)
+
+output$plot
+```

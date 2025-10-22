@@ -120,7 +120,7 @@ A list with the following components:
 }
 }
 \description{
-Runs the full CLAMP model using a gene expression matrix
+Runs the full CLAMP (Compressed Latent-variable Approach for Massive data Processing) model using a gene expression matrix
 and prior pathway annotation matrix. This function performs latent variable decomposition
 guided by prior knowledge and includes optional cross-validation to evaluate pathway associations.
 }

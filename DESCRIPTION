@@ -1,6 +1,6 @@
-Package: CLAMP
 Type: Package
-Title: Pathway-Level Information ExtractoR 2 
+Package: CLAMP
+Title: Compressed Latent-variable Approach for Massive data Processing
 Version: 0.99.0
 Authors@R: 
     c(
@@ -26,23 +26,28 @@ Depends:
     R (>= 4.4.0)
 Imports:
     bigstatsr,
-    Matrix,
-    rlang,
-    rsvd,
-    irlba,
-    glmnet,
-    stats,
+    circlize,
+    ComplexHeatmap,
     dplyr,
     ggplot2,
     ggrepel,
+    glmnet,
+    grid,
+    irlba,
+    Matrix,
+    matrixStats,
+    rlang,
+    rsvd,
+    stats,
     utils,
+    Rcpp,
     BiocGenerics
 Suggests:
     AnnotationDbi,
     BiocStyle,
-    DT,
-    DiagrammeR,
     data.table,
+    DiagrammeR,
+    DT,
     hdf5r,
     here,
     knitr,
@@ -51,10 +56,13 @@ Suggests:
     rmarkdown,
     testthat (>= 3.0.0),
     CLAMPData
-VignetteBuilder: knitr
+LinkingTo: Rcpp, RcppArmadillo
+VignetteBuilder:  knitr
+biocViews: Software, GeneExpression, RNASeq, Transcriptomics,
+    DimensionReduction, Visualization, Normalization, Pathways,
+    Preprocessing, GenePrediction
 Encoding: UTF-8
-LazyData: false
-biocViews: Software, GeneExpression, RNASeq, Transcriptomics, DimensionReduction, Visualization, Normalization, Pathways, Preprocessing, GenePrediction
+LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Config/testthat/edition: 3

@@ -11,7 +11,7 @@ Row names are gene symbols; column names are sample IDs.
 A numeric matrix with genes as rows and samples as columns.
 }
 \usage{
-data(dataWholeBlood)
+dataWholeBlood
 }
 \value{
 A matrix of expression values.

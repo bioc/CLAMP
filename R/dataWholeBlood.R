@@ -5,7 +5,7 @@
 #'
 #' @format A numeric matrix with G genes and N samples.
 #'   Row names are gene symbols; column names are sample IDs.
-#' @usage data(dataWholeBlood)
+#' @usage dataWholeBlood
 #' @keywords datasets
 #' @docType data
 #' @name dataWholeBlood
