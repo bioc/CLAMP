@@ -6,7 +6,7 @@
 \usage{
 CLAMPbase(
   Y,
-  k,
+  k = NULL,
   svdres = NULL,
   L1 = NULL,
   L2 = NULL,
@@ -75,7 +75,7 @@ A list with components:
 }
 }
 \description{
-Runs the core matrix factorization procedure of CLAMP,
+Runs the core matrix factorization procedure of CLAMP (Compressed Latent-variable Approach for Massive data Processing),
 decomposing the gene expression matrix \code{Y} into latent variables \code{Z} and loadings \code{B}.
 It supports sparse, dense, and Filebacked Big Matrices (FBM) as input and includes options for
 adaptive sparsity, positive constraints, and regularization.

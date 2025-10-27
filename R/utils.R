@@ -40,18 +40,38 @@ allAgainstAllAUCs <- function(B, target) {
 
 #' Row-wise scaling (mean 0, sd 1)
 #'
-#' Standardize each row of a numeric matrix to have mean 0 and
-#' standard deviation 1.
+#' Standardizes each row of a numeric matrix to have mean 0 and
+#' standard deviation 1. Missing values are ignored in the computation
+#' of the mean and standard deviation.
 #'
-#' @param x A numeric matrix.
-#' @return A matrix of the same shape, with each row scaled independently.
+#' @param x A numeric matrix. Each row will be scaled independently.
+#'
+#' @return
+#' A numeric matrix of the same dimensions as `x`, where each row
+#' has mean 0 and standard deviation 1 (ignoring `NA`s). If a row
+#' has zero variance, it is returned unchanged.
+#'
+#' @examples
+#' mat <- matrix(1:9, nrow = 3)
+#' tscale(mat)
+#'
+#' @seealso [base::scale()]
+#'
 #' @export
 tscale <- function(x) {
-  row_means <- rowMeans(x)
-  row_sds <- sqrt(rowMeans((x - row_means)^2))
-  row_sds[row_sds == 0] <- 1  # avoid division by zero
-  sweep(sweep(x, 1, row_means), 1, row_sds, "/")
+  if (!is.matrix(x) || !is.numeric(x)) {
+    stop("Input 'x' must be a numeric matrix.")
+  }
+  
+  row_means <- rowMeans(x, na.rm = TRUE)
+  row_sds <- sqrt(rowMeans((x - row_means)^2, na.rm = TRUE))
+  row_sds[row_sds == 0 | is.na(row_sds)] <- 1  # avoid division by zero
+  
+  scaled <- sweep(sweep(x, 1, row_means, "-"), 1, row_sds, "/")
+  dimnames(scaled) <- dimnames(x)
+  scaled
 }
+
 
 
 

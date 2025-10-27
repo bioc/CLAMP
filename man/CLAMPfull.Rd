@@ -2,141 +2,143 @@
 % Please edit documentation in R/solvers.R
 \name{CLAMPfull}
 \alias{CLAMPfull}
-\title{Full CLAMP model with prior information and cross-validation}
+\title{Runs the streamlined full CLAMP (Compressed Latent-variable Approach for Massive data Processing) model.}
 \usage{
 CLAMPfull(
   Y,
   priorMat,
+  Chat = NULL,
   svdres = NULL,
   clamp.base.result = NULL,
   k = NULL,
   L1 = NULL,
   L2 = NULL,
-  top = NULL,
   cvn = 5,
-  max.iter = 350,
-  trace = FALSE,
-  Chat = NULL,
+  max.iter = 30,
+  trace = TRUE,
   maxPath = 10,
   doCrossval = TRUE,
   penalty.factor = rep(1, ncol(priorMat)),
   glm_alpha = 0.9,
-  minGenes = 10,
+  minGenes = 0,
   tol = 5e-04,
   seed = 123456,
   allGenes = FALSE,
   rseed = NULL,
-  max.U.updates = 5,
-  pathwaySelection = c("fast"),
-  multiplier = 1,
+  max.U.updates = Inf,
+  pathwaySelection = c("fast", "complete"),
+  multiplier = 5,
   adaptive.p = 0.05,
   useNNLS = TRUE,
   useRaw = TRUE,
-  refitAll = FALSE,
+  refitEvery = 3,
   useSE = FALSE,
-  ncores = 1
+  var.prior = TRUE,
+  Uscale = FALSE,
+  robust.vp = TRUE,
+  use_cpp = F
 )
 }
 \arguments{
-\item{Y}{Gene expression matrix (genes x samples). Can be dense, sparse (dgCMatrix), or FBM.}
+\item{Y}{Gene expression matrix (genes × samples). Can be dense, sparse (dgCMatrix), or FBM.}
 
-\item{priorMat}{Binary matrix (genes x pathways) representing prior annotations.}
+\item{priorMat}{Binary or weighted prior matrix (genes × pathways) linking genes to pathways.}
 
-\item{svdres}{Optional SVD result used for initialization.}
+\item{Chat}{Ignored in this version (kept for interface compatibility).}
 
-\item{clamp.base.result}{Optional result from \code{CLAMPbase()} to initialize B.}
+\item{svdres}{Optional precomputed SVD result for initialization.}
 
-\item{k}{Number of latent variables. If \code{NULL}, estimated from SVD.}
+\item{clamp.base.result}{Optional result from \code{CLAMPbase()} providing initial values.}
 
-\item{L1}{Regularization strength for Z. If \code{NULL}, initialized from SVD or \code{clamp.base.result}.}
+\item{k}{Number of latent variables. Estimated from data if \code{NULL}.}
 
-\item{L2}{Regularization strength for B. If \code{NULL}, initialized from SVD or \code{clamp.base.result}.}
+\item{L1, L2}{Regularization parameters for \code{Z} and \code{B}. Defaults use values from
+\code{clamp.base.result}.}
 
-\item{top}{If set, keeps only top-n values per column in Z during U updates.}
+\item{cvn}{Number of folds for pathway-level cross-validation. Default: 5.}
 
-\item{cvn}{Number of folds for cross-validation in U updates. Default is 5.}
+\item{max.iter}{Maximum number of outer iterations. Default: 30.}
 
-\item{max.iter}{Maximum number of iterations. Default is 350.}
+\item{trace}{Logical; print iteration progress. Default: \code{TRUE}.}
 
-\item{trace}{Logical; if \code{TRUE}, prints iteration progress.}
+\item{maxPath}{Maximum number of pathways per LV during U-fitting. Default: 10.}
 
-\item{Chat}{Optional precomputed matrix for solving U.}
+\item{doCrossval}{Whether to mask prior entries for CV evaluation. Default: \code{TRUE}.}
 
-\item{maxPath}{Maximum number of pathways/features selected per LV. Default is 10.}
+\item{penalty.factor}{Optional vector of per-pathway penalties for glmnet. Default: 1.}
 
-\item{doCrossval}{Whether to perform pathway-level cross-validation. Default is \code{TRUE}.}
+\item{glm_alpha}{Elastic net mixing parameter for U estimation. Default: 0.9.}
 
-\item{penalty.factor}{Vector of feature-specific penalties for glmnet. Default: all ones.}
+\item{minGenes}{Minimum number of genes per pathway. Default: 0.}
 
-\item{glm_alpha}{Elastic net mixing parameter for glmnet. Default is 0.9.}
+\item{tol}{Convergence tolerance for B updates. Default: 5e-4.}
 
-\item{minGenes}{Minimum number of genes per pathway to retain. Default is 10.}
+\item{seed}{Random seed for CV masking. Default: 123456.}
 
-\item{tol}{Convergence tolerance on relative change in B. Default is 5e-4.}
+\item{allGenes}{If \code{TRUE}, adds zero-filled rows for missing genes. Default: \code{FALSE}.}
 
-\item{seed}{Seed for reproducibility of cross-validation masking. Default is 123456.}
+\item{rseed}{Reproducibility, coordinate descent updates are done in random order.}
 
-\item{allGenes}{If \code{TRUE}, zero-fills \code{priorMat} for genes not present. Default is \code{FALSE}.}
+\item{max.U.updates}{Maximum number of U updates (capped by max.iter).}
 
-\item{rseed}{Optional seed for randomly reinitializing B and Z.}
+\item{pathwaySelection}{Pathway selection mode for U fitting (\code{"fast"} or \code{"complete"}).}
 
-\item{max.U.updates}{Maximum number of U updates. Default is 5.}
+\item{multiplier}{Variance-prior scaling factor. Default: 5.}
 
-\item{pathwaySelection}{Pathway selection mode: \code{"fast"} or \code{"complete"}.}
+\item{adaptive.p}{Quantile of negative Z values used to define adaptive thresholding. Default: 0.05.}
 
-\item{multiplier}{Scaling factor for adjusting L1 and L2.}
+\item{useNNLS}{Whether to use non-negative least squares for U estimation. Default: \code{TRUE}.}
 
-\item{adaptive.p}{Quantile threshold for adaptively zeroing small Z values. After each update,
-the \code{adaptive.p}-quantile of negative entries in Z is used (flipped positive) to threshold
-small positive values, assuming they reflect noise. Default is 0.05.}
+\item{useRaw}{If \code{TRUE}, uses unthresholded Z in U updates. Default: \code{TRUE}.}
 
-\item{useNNLS}{If \code{TRUE}, uses non-negative least squares in U estimation. Default is \code{TRUE}.}
+\item{refitEvery}{Frequency (in U updates) of full refits. Default: 3.}
 
-\item{useRaw}{If \code{TRUE}, uses unthresholded Z for solving U. Default is \code{TRUE}.}
+\item{var.prior}{Logical; if \code{TRUE}, enables adaptive variance prior updates for Z.
+Default: \code{TRUE}.}
 
-\item{refitAll}{If \code{TRUE}, refits all U columns every update. Default is \code{FALSE}.}
+\item{Uscale}{Logical; whether to scale U columns. Default: \code{FALSE}.}
 
-\item{useSE}{Logical; passed to the internal \code{solveU()} call. If \code{TRUE},
-enables standard-error–aware selection when fitting U (pathway coefficients). Default is \code{FALSE}.}
+\item{robust.vp}{Logical; winsorize prior-predicted Z2 values to reduce outlier effects. Default: \code{TRUE}.}
 
-\item{ncores}{Number of cores to use for parallel computation (only used if Y is an FBM). Default is 1.}
+\item{delta.method}{Logical; use delta method for for Z updates. Good for large datasets.  Default: \code{FALSE}.}
 }
 \value{
-A list with the following components:
+A list with elements:
 \describe{
-\item{\code{B}}{Latent variable loadings (LVs x genes)}
-\item{\code{Z}}{Latent variable matrix (LVs x samples)}
-\item{\code{U}}{Pathway loadings matrix (pathways x LVs)}
-\item{\code{C}}{Masked prior matrix used for training}
-\item{\code{L1}, \code{L2}}{Regularization parameters}
-\item{\code{heldOutGenes}}{List of held-out genes per pathway (if CV is enabled)}
-\item{\code{Uauc}}{AUC matrix from CV evaluation (if enabled)}
-\item{\code{Up}}{-\code{log10(p)} values from CV evaluation (if enabled)}
-\item{\code{summary}}{Data frame of AUC, p-values, and FDR per pathway x LV (if enabled)}
-\item{\code{priorMatCV}}{Masked prior matrix used during CV}
-\item{\code{priorMat}}{Final filtered prior matrix}
-\item{\code{withPrior}}{Indices of LVs with non-zero pathway loadings}
+\item{\code{B}}{LV loadings on samples (k × samples)}
+\item{\code{Z}}{Gene loadings (genes × k)}
+\item{\code{U}}{Pathway loadings (pathways × k)}
+\item{\code{C}}{Prior matrix used during training (masked if CV)}
+\item{\code{Z2}}{Predicted Z from pathway priors}
+\item{\code{heldOutGenes}}{Held-out gene lists per pathway (CV mode)}
+\item{\code{Uauc, Up, summary}}{CV evaluation metrics if CV is enabled}
+\item{\code{priorMat, priorMatCV}}{Final and masked prior matrices}
 \item{\code{call}}{Function call}
 }
 }
 \description{
-Runs the full CLAMP (Compressed Latent-variable Approach for Massive data Processing) model using a gene expression matrix
-and prior pathway annotation matrix. This function performs latent variable decomposition
-guided by prior knowledge and includes optional cross-validation to evaluate pathway associations.
+This version performs latent-variable decomposition of a gene expression matrix \code{Y}
+guided by prior pathway annotations \code{priorMat}, with simplified and lighter regularization
+compared to the original extended CLAMP variant. The algorithm alternates updates of \code{Z},
+\code{B}, and \code{U}, where \code{U} captures pathway–latent variable associations inferred
+directly from the data without ridge-regularized projections (\code{Chat} is not used).
 }
 \details{
-The model alternates between solving \code{Z}, \code{B}, and \code{U}. Adaptive sparsity is applied
-to \code{Z} using a dynamic threshold based on the negative tail of its distribution. Cross-validation
-is used to hold out gene annotations in \code{priorMat} and evaluate latent variable specificity.
+Cross-validation can be used to evaluate pathway–LV specificity, and a variance-based prior
+(\code{var.prior = TRUE}) introduces adaptive shrinkage of \code{Z} based on how strongly
+each latent component aligns with prior pathways. The scaling factor \code{multiplier} (default 5)
+controls the strength of this adaptive shrinkage.
+
+This implementation omits ridge-projected priors (\code{Chat}) and uses a lighter variance prior
+with a lower default \code{multiplier = 5}, allowing more flexible latent representations.
+Setting \code{var.prior = FALSE} reproduces standard CLAMP-like updates. Cross-validation, if
+enabled, masks 20\% of gene–pathway associations per column to estimate pathway–LV specificity
+(reported via AUC and p-values).
 }
 \examples{
 mat <- matrix(rnorm(100), 10, 10)
-svdres <- rsvd::rsvd(mat, k = 5)
-base <- CLAMPbase(Y = mat, k = 5, svdres = svdres, trace = FALSE)
-priorMat <- matrix(1, nrow(mat), 5)
-full <- CLAMPfull(
-    Y = mat, priorMat = priorMat, svdres = svdres,
-    clamp.base.result = base, k = 5,
-    doCrossval = FALSE, trace = FALSE, max.U.updates = 0
-)
+base <- CLAMPbase(mat, k = 5)
+prior <- matrix(sample(0:1, 40, TRUE), 10, 4)
+fit <- CLAMPfull(Y = mat, priorMat = prior, clamp.base.result = base,
+                   doCrossval = FALSE, trace = FALSE)
 }

@@ -7,12 +7,23 @@
 tscale(x)
 }
 \arguments{
-\item{x}{A numeric matrix.}
+\item{x}{A numeric matrix. Each row will be scaled independently.}
 }
 \value{
-A matrix of the same shape, with each row scaled independently.
+A numeric matrix of the same dimensions as \code{x}, where each row
+has mean 0 and standard deviation 1 (ignoring \code{NA}s). If a row
+has zero variance, it is returned unchanged.
 }
 \description{
-Standardize each row of a numeric matrix to have mean 0 and
-standard deviation 1.
+Standardizes each row of a numeric matrix to have mean 0 and
+standard deviation 1. Missing values are ignored in the computation
+of the mean and standard deviation.
+}
+\examples{
+mat <- matrix(1:9, nrow = 3)
+tscale(mat)
+
+}
+\seealso{
+\code{\link[base:scale]{base::scale()}}
 }

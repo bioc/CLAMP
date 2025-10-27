@@ -558,7 +558,7 @@ crossVal <- function(clampRes, priorMat, priorMatcv) {
 
 #' CLAMP base matrix factorization
 #'
-#' Runs the core matrix factorization procedure of CLAMP,
+#' Runs the core matrix factorization procedure of CLAMP (Compressed Latent-variable Approach for Massive data Processing),
 #' decomposing the gene expression matrix \code{Y} into latent variables \code{Z} and loadings \code{B}.
 #' It supports sparse, dense, and Filebacked Big Matrices (FBM) as input and includes options for
 #' adaptive sparsity, positive constraints, and regularization.
@@ -610,16 +610,16 @@ crossVal <- function(clampRes, priorMat, priorMatcv) {
 #'
 #' @export
 CLAMPbase <- function(
-        Y, k, svdres = NULL, L1 = NULL, L2 = NULL,
-        Zpos = TRUE, max.iter = 200, tol = 5e-4, trace = FALSE,
-        rseed = NULL, B = NULL, scale = 1, pos.adj = 3, adaptive.p = 0.05, adaptive.iter = 20,
-        cutoff = 0, ncores = 1) {
-    if (ncores > 1) {
-        # if we are parallelizing, then disable BLAS parallelization
-        options(bigstatsr.check.parallel.blas = FALSE)
-        blas_nproc <- getOption("default.nproc.blas")
-        options(default.nproc.blas = NULL)
-    }
+    Y, k=NULL, svdres = NULL, L1 = NULL, L2 = NULL,
+    Zpos = TRUE, max.iter = 200, tol = 5e-4, trace = FALSE,
+    rseed = NULL, B = NULL, scale = 1, pos.adj = 3, adaptive.p = 0.05, adaptive.iter = 20,
+    cutoff = 0, ncores = 1) {
+  if (ncores > 1) {
+    # if we are parallelizing, then disable BLAS parallelization
+    options(bigstatsr.check.parallel.blas = FALSE)
+    blas_nproc <- getOption("default.nproc.blas")
+    options(default.nproc.blas = NULL)
+  }
 
   # message("Checking type")
   # Detect matrix type
@@ -849,13 +849,13 @@ CLAMPbase <- function(
 #' svdres <- rsvd::rsvd(mat, k = 5)
 #' base <- CLAMPbase(Y = mat, k = 5, svdres = svdres, trace = FALSE)
 #' priorMat <- matrix(1, nrow(mat), 5)
-#' full <- CLAMPfull(
+#' full <- CLAMPfullnVP(
 #'     Y = mat, priorMat = priorMat, svdres = svdres,
 #'     clamp.base.result = base, k = 5,
 #'     doCrossval = FALSE, trace = FALSE, max.U.updates = 0
 #' )
 #' @export
-CLAMPfull <- function(
+CLAMPfullnVP <- function(
     Y, priorMat, svdres = NULL, clamp.base.result = NULL, k = NULL, L1 = NULL, L2 = NULL, top = NULL,
     cvn = 5, max.iter = 350, trace = FALSE, Chat = NULL, maxPath = 10, doCrossval = TRUE,
     penalty.factor = rep(1, ncol(priorMat)), glm_alpha = 0.9,
@@ -876,7 +876,7 @@ CLAMPfull <- function(
 
   priorMat <- as.matrix(priorMat)
 
-  message("**CLAMP v2 **")
+  message("**CLAMPfullnVP v2 **")
 
   # Detect matrix type
   is_fbm <- inherits(Y, "FBM")
@@ -1468,10 +1468,10 @@ ridge_B <- function(Y, Z, L2k) {
 #' mat <- matrix(rnorm(100), 10, 10)
 #' base <- CLAMPbase(mat, k = 5)
 #' prior <- matrix(sample(0:1, 40, TRUE), 10, 4)
-#' fit <- CLAMPfullVP(Y = mat, priorMat = prior, clamp.base.result = base,
+#' fit <- CLAMPfull(Y = mat, priorMat = prior, clamp.base.result = base,
 #'                    doCrossval = FALSE, trace = FALSE)
 #' @export
-CLAMPfullVP <- function(
+CLAMPfull <- function(
     Y, priorMat, Chat=NULL,svdres = NULL, clamp.base.result = NULL, k = NULL, L1 = NULL, L2 = NULL,
     cvn = 5, max.iter = 30, trace = TRUE,  maxPath = 10, doCrossval = TRUE,
     penalty.factor = rep(1, ncol(priorMat)), glm_alpha = 0.9,
@@ -1484,13 +1484,11 @@ CLAMPfullVP <- function(
   pathwaySelection <- match.arg(pathwaySelection, c("fast", "complete"))
   priorMat <- as.matrix(priorMat)
 
-  message("** CLAMP full VP final **")
+  message("** CLAMPfull **")
 
   ## Detect matrix type (FBM block preserved for compatibility)
   is_fbm <- inherits(Y, "FBM")
   is_sparse <- inherits(Y, "dgCMatrix")
-
-
 
   getVarMultiplier <- function(Zinput, Z2) {
     Zmultiplier <- matrix(0, nrow = nrow(Zinput), ncol = ncol(Zinput))
@@ -1516,7 +1514,6 @@ CLAMPfullVP <- function(
     }
     Zmultiplier
   }
-
 
   ## Align genes
   if (nrow(priorMat) != nrow(Y) || !all(rownames(priorMat) == rownames(Y))) {

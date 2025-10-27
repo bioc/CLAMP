@@ -2,7 +2,7 @@
 
 export(CLAMPbase)
 export(CLAMPfull)
-export(CLAMPfullVP)
+export(CLAMPfullnVP)
 export(allAgainstAllAUCs)
 export(compareBs)
 export(cpmCLAMP)
