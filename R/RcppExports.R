@@ -2,10 +2,10 @@
 # Generator token: 10BE3573-1514-4C36-9D1C-5A225CD40393
 
 updateZcpp <- function(ZSEXP, YSEXP, BSEXP, B2SEXP, bk2_all, YBtSEXP, QSEXP, ZmultiplierSEXP, L1, multiplier, inner_iter, iter, Y_is_fbm = FALSE, n = 0L, p = 0L) {
-    invisible(.Call('_CLAMP_updateZcpp', PACKAGE = 'CLAMP', ZSEXP, YSEXP, BSEXP, B2SEXP, bk2_all, YBtSEXP, QSEXP, ZmultiplierSEXP, L1, multiplier, inner_iter, iter, Y_is_fbm, n, p))
+    invisible(.Call(`_CLAMP_updateZcpp`, ZSEXP, YSEXP, BSEXP, B2SEXP, bk2_all, YBtSEXP, QSEXP, ZmultiplierSEXP, L1, multiplier, inner_iter, iter, Y_is_fbm, n, p))
 }
 
 updateZcppOld <- function(Z, Y, B, B2, bk2_all, YBt, Q, Zmultiplier, L1, multiplier, inner_iter, iter) {
-    invisible(.Call('_CLAMP_updateZcppOld', PACKAGE = 'CLAMP', Z, Y, B, B2, bk2_all, YBt, Q, Zmultiplier, L1, multiplier, inner_iter, iter))
+    invisible(.Call(`_CLAMP_updateZcppOld`, Z, Y, B, B2, bk2_all, YBt, Q, Zmultiplier, L1, multiplier, inner_iter, iter))
 }
 

@@ -54,12 +54,20 @@ knitr::include_graphics("../man/figures/clamp.png", dpi = 800)
 The CLAMP (**C**ompressed **L**atent-variable **A**pproach for **M**assive data **P**rocessing) 
 package provides a two-stage framework to extract interpretable latent
 variables from high-dimensional transcriptomic data.
-It combines a standard matrix decomposition (CLAMPbase) with
-pathway-guided factor refinement (CLAMPfull), enabling:
+It combines a standard matrix decomposition (**CLAMPbase**) with
+pathway-guided factor refinement (**CLAMPfull**), enabling:
 
 1. **Dimensionality reduction** of gene expression matrices  
 2. **Incorporation of prior knowledge** (e.g., Gene Ontology or MSigDB)  
-3. **Cross-validation** to select robust latent variables  
+3. **Adaptive regularization** of gene weights based on their agreement with pathway priors  
+4. **Cross-validation** to select robust latent variables  
+
+In CLAMPfull, pathway information is integrated through an adaptive **variance prior** that dynamically
+modulates the contribution of each gene according to how well its latent signal aligns with pathway predictions.
+This mechanism allows CLAMP to emphasize biologically consistent genes while maintaining flexibility
+to discover novel, data-driven components.  
+By combining prior-guided regularization with scalable matrix updates, CLAMPfull produces interpretable
+latent variables that capture both known and emergent biological processes across large transcriptomic datasets.
 
 ## Workflow overview
 
@@ -81,52 +89,37 @@ grViz('
    node [shape=rectangle, style=filled, fillcolor=White]
    preDF      [label="preprocessCLAMP()"]
    zDF        [label="zscoreCLAMP()"]
-   svdDF      [label="rsvd()"]
    preFBM     [label="preprocessCLAMPFBM()"]
    zFBM       [label="zscoreCLAMPFBM()"]
-   svdFBM     [label="big_randomSVD()"]
-   numpc      [label="num.pc()"]
    gmtList    [label="gmtListToSparseMat()"]
    matchPaths [label="getMatchedPathwayMat()"]
    chatFunc   [label="getChat()"]
    base       [label="CLAMPbase()"]
    full       [label="CLAMPfull()"]
-   dotplot    [label="dotplotCLAMP()"]
 
-   // ---- Outputs (light‑blue tabs) ----
+   // ---- Outputs (light-blue tabs) ----
    node [shape=tab, style=filled, fillcolor=LightBlue]
    filtered     [label="Y_filtered, rowStats"]
    zscored      [label="Y_zscored"]
-   svdres1      [label="svdres"]
    filteredFBM  [label="FBM_filtered, rowStats"]
    zscoredFBM   [label="FBM_zscored"]
-   svdres2      [label="svdres"]
-   CLAMP_K      [label="CLAMP_K"]
    baseResult   [label="CLAMPbase.result"]
    Chat         [label="Chat"]
    Zmat         [label="Z"]
    Bmat         [label="B"]
    summaryTbl   [label="summary"]
    Umat         [label="U"]
-   dotImg       [label="CLAMP dot plot"]
 
-   // ---- In‑memory branch ----
-   DF -> preDF -> filtered -> zDF -> zscored -> svdDF -> svdres1 -> base -> baseResult -> full
-   // ---- On‑disk branch ----
-   H5 -> preFBM -> filteredFBM -> zFBM -> zscoredFBM -> svdFBM -> svdres2 -> base
-   // ---- num.pc() branch ----
-   svdres1 -> numpc -> CLAMP_K -> full
-   svdres2 -> numpc
-   // ---- Connect CLAMP_K to CLAMPbase too ----
-   CLAMP_K -> base
-   // ---- Prior‑knowledge branch ----
+   // ---- In-memory branch ----
+   DF -> preDF -> filtered -> zDF -> zscored -> base -> baseResult -> full
+   // ---- On-disk branch ----
+   H5 -> preFBM -> filteredFBM -> zFBM -> zscoredFBM -> base
+   // ---- Prior-knowledge branch ----
    GO -> gmtList; MSIGDB -> gmtList; GTEx -> gmtList
    gmtList -> matchPaths -> chatFunc -> Chat
    Chat -> full
-   // ---- CLAMPfull outputs & dotplot ----
-   full -> Zmat; full -> Bmat; full -> summaryTbl -> dotplot; full -> Umat
-   // ---- Connect dotplotCLAMP() to your tab node ----
-   dotplot -> dotImg
+   // ---- CLAMPfull outputs ----
+   full -> Zmat; full -> Bmat; full -> summaryTbl; full -> Umat
  }')
 ```
 
@@ -147,11 +140,10 @@ We provide three self-contained examples:
 
 Each example follows these steps:
 
-1. **Load & preprocess data** (filter by mean/variance, then z-score)  
-2. **Prepare pathway annotations** via `getGMT()` and construct the prior matrix  
-3. **Compute SVD** (in-memory or file-backed) and infer model dimension `k`  
-4. **Run CLAMPbase** to initialize latent variables  
-5. **Run CLAMPfull** to refine with pathway priors and obtain summary statistics  
+1. **Load & preprocess data** (filter by mean/variance, then z-score).
+2. **Prepare pathway annotations** via `getGMT()` and construct the prior matrix.
+3. **Run CLAMPbase** to compute the SVD, infer the model dimension `k`, and initialize the latent variables.
+4. **Run CLAMPfull** to refine latent variables using pathway priors and variance-adaptive regularization, producing the final model and summary statistics.
 
 # Example 1: In-memory data.frame (Whole Blood)
 
@@ -194,62 +186,54 @@ wb_Y_z <- zscoreCLAMP(
 )
 ```
 
-## 3. SVD computation and SVD K estimation
+## 3. CLAMPbase initialization
 
-Compute a robust SVD on the normalized matrix and infer the optimal number of latent variables K.
+First, we initialize latent variables using `CLAMPbase`, which performs SVD and K inference and matrix factorization without priors.
 
-```{r svd-k, message=TRUE}
-# Determine SVD k
-n_genes <- nrow(wb_Y_z)
-n_samples <- ncol(wb_Y_z)
-SVD_K_wd <- min(n_genes, n_samples) - 1
-message("Using SVD K = ", SVD_K_wd)
-
-# Compute full SVD
-
-dataWholeBlood.svd <- rsvd(dataWholeBlood, k = SVD_K_wd)
-
-wb_svdRes <- rsvd(
-    wb_Y_z,
-    k = SVD_K_wd
-)
-```
-
-## 4. Estimate K for CLAMP 
-
-Estimate k via permutation/elbow method
-
-```{r CLAMP-k, message=TRUE}
-CLAMP_K_wb <- num.pc(data = wb_Y_z)
-message("Inferred CLAMP K = ", CLAMP_K_wb)
-```
-
-## 5. CLAMPbase initialization
-
-First, we initialize latent variables using `CLAMPbase`, which performs matrix factorization without priors.
+The argument `adaptive.p` defines the percentile used to determine the adaptive sparsity threshold applied to each latent variable’s gene loadings.  
+During alternating updates, negative entries in `Z` are treated as noise, and CLAMP estimates a cutoff based on the `adaptive.p` quantile of these negative values.  
+All genes with loadings below this cutoff are set to zero.  
+This produces **data-driven sparsity**, automatically filtering weak or noisy signals while retaining genes with the strongest positive contributions.  
+Lower values of `adaptive.p` (e.g., 0.01) result in stronger sparsity, while higher values (e.g., 0.1) retain more genes.  
+The default `adaptive.p = 0.05` typically yields interpretable, well-separated latent variables in large transcriptomic datasets.
 
 ```{r CLAMPbase, message=FALSE}
 wb_baseRes <- CLAMPbase(
-    Y      = wb_Y_z,
-    k      = CLAMP_K_wb,
-    svdres = wb_svdRes,
-    trace  = TRUE
+    Y = wb_Y_z,
+    trace = FALSE,
+    adaptive.p = 0.05
 )
 ```
 
-## 6. Prepare pathway priors
+## 4. Prepare pathway priors
 
 Next, we build a prior matrix from curated gene sets and compute the Chat object for `CLAMPfull`.
 
-```{r priors, message=FALSE}
-wb_gmtList <- list(
-    GTEx_Tissues = getGMT("https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=GTEx_Tissues_V8_2023"),
-    BP = getGMT("https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=GO_Biological_Process_2025"),
-    MSigDB = getGMT("https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=MSigDB_Hallmark_2020")
+```{r}
+# Download pathway and cell marker libraries from Enrichr
+gmtList <- list(
+  CellMarkers = getGMT(
+    "https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=CellMarker_2024",
+    "CellMarker_2024"
+  ),
+  KEGG = getGMT(
+    "https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=KEGG_2021_Human",
+    "KEGG_2021_Human"
+  )
 )
-wb_pathMat <- gmtListToSparseMat(wb_gmtList)
-wb_matched <- getMatchedPathwayMat(wb_pathMat, rownames(wb_Y_z))
-wb_chatObj <- getChat(wb_matched)
+
+# Combine into a single sparse matrix
+pathMatCell <- gmtListToSparseMat(gmtList)
+
+# Load additional xCell reference matrix
+data("xCell")
+
+# Match pathways to the gene space of whole blood
+matchedPathsWB <- getMatchedPathwayMatList(
+  pathMatCell, xCell,
+  new.genes = rownames(dataWholeBlood),
+  min.genes = 2
+)
 ```
 
 ## 7. CLAMPfull
@@ -259,16 +243,12 @@ which applies cross-validation.
 
 ```{r CLAMPfull, message=FALSE}
 wb_fullRes <- CLAMPfull(
-    Y                 = wb_Y_z,
-    priorMat          = as.matrix(wb_matched),
-    svdres            = wb_svdRes,
+    dataWholeBlood,
+    priorMat = matchedPathsWB,
     clamp.base.result = wb_baseRes,
-    Chat              = wb_chatObj,
-    k                 = wb_k_pl,
-    doCrossval        = TRUE,
-    trace             = TRUE,
-    max.U.updates     = 50
-)
+    trace = TRUE, 
+    use_cpp = T
+  )
 ```
 
 ## 8. Display significant latent variables

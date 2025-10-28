@@ -1,3 +1,7 @@
+#' @useDynLib CLAMP, .registration=TRUE
+#' @importFrom Rcpp sourceCpp
+NULL
+
 #' Adjust p-values using Benjamini-Hochberg method
 #'
 #' Applies the BH (Benjamini-Hochberg) correction for
@@ -50,7 +54,6 @@ mat_mult <- function(mat1, mat2, ncores = 1) {
     return(mat1 %*% mat2)
   }
 }
-
 
 #' Ridge-regularized pseudoinverse via SVD
 #'
@@ -633,8 +636,12 @@ CLAMPbase <- function(
   BdiffTrace <- double()
   BdiffCount <- 0
   message("****")
-  #  k <- min(k, min(dim(Y)) - 1)
 
+  if (is.null(k)) {
+    k <- min(50, min(dim(Y)) - 1)  # safe default upper bound
+    message(paste0("Initial k not provided, temporarily set to ", k))
+  }
+  
   if (is.null(svdres) && is.null(B)) {
     message("Computing SVD")
     if (is_fbm) {
