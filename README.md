@@ -20,16 +20,15 @@ The goal of CLAMP (**C**ompressed **L**atent-variable **A**pproach for **M**assi
 We keep a fully specified environment file at `envs/clamp.yaml`. From your package root, create and activate it like so:
 
 ```bash
-# Create and activate environment
+# Create and activate the environment
 conda env create -f envs/clamp.yaml
 conda activate clamp
 
-# Install CLAMP from local path (adjust REPO_PATH)
+# Define the repository path (adjust as needed)
 REPO_PATH=~/path/to/CLAMP
 
-# Run R commands non-interactively
-Rscript -e "install.packages('remotes', repos='https://cloud.r-project.org')"
-Rscript -e "remotes::install_local('$REPO_PATH', force=TRUE, dependencies=FALSE)"
+# Install and check CLAMP using devtools
+Rscript -e "devtools::install_local('$REPO_PATH', force=TRUE, dependencies=FALSE)"
 Rscript -e "library(CLAMP); cat('CLAMP version:', packageVersion('CLAMP'), '\n')"
 ```
 
