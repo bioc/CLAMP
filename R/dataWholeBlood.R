@@ -1,18 +1,20 @@
 #' Whole-blood reference expression matrix
 #'
 #' A numeric matrix of whole-blood gene expression
-#' (rows = genes, cols = samples).
+#' where rows correspond to genes and columns to samples.
 #'
-#' @format A numeric matrix with G genes and N samples.
-#'   Row names are gene symbols; column names are sample IDs.
-#' @usage dataWholeBlood
+#' @format A numeric matrix with G genes (rows) and N samples (columns).
+#'   Row names are gene symbols, and column names are sample IDs.
+#'
+#' @usage data(dataWholeBlood)
+#'
 #' @keywords datasets
 #' @docType data
 #' @name dataWholeBlood
 #' @aliases dataWholeBlood
+#'
+#' @return A numeric matrix of expression values.
+#'
 #' @examples
 #' data(dataWholeBlood)
-#' dim(dataWholeBlood)
-#' @format A numeric matrix with genes as rows and samples as columns.
-#' @return A matrix of expression values.
 "dataWholeBlood"

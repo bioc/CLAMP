@@ -20,8 +20,8 @@ solveU(
   scale = TRUE,
   refit = TRUE,
   Uprev = NULL,
-  useAUC = T,
-  intercept = T,
+  useAUC = TRUE,
+  intercept = TRUE,
   ...
 )
 }
@@ -59,6 +59,10 @@ Can be used incombination with \code{top}. Default is \code{FALSE}.}
 \item{Uprev}{(Optional) Previous U matrix to reuse. In this mode only the columns of \code{U}
 that are all zero are estimated. Used internally in \code{CLAMP}.}
 
+\item{useAUC}{Logical; whether to compute pathway–LV associations using AUC (default TRUE) instead of OLS.}
+
+\item{intercept}{Logical; whether to include an intercept term in glmnet models. Default is TRUE.}
+
 \item{...}{Additional arguments passed to \code{glmnet()} or \code{cv.glmnet()}.}
 }
 \value{
@@ -73,4 +77,26 @@ For each column of a target matrix \code{Z} using pathway or prior annotation \c
 It performs regularization selection using cross-validation and can apply either
 Supports continuous or binary response models. Relaxed refitting is supported for final
 coefficient estimation.
+}
+\examples{
+set.seed(123)
+genes <- paste0("G", 1:200)
+lvs   <- paste0("LV", 1:4)
+paths <- paste0("Path", 1:60)
+
+Z <- matrix(rnorm(200 * 4), nrow = 200, dimnames = list(genes, lvs))
+
+priorMat <- matrix(rbinom(200 * 60, 1, 0.07),
+                   nrow = 200, dimnames = list(genes, paths))
+
+fit1 <- solveU(
+  Z = Z,
+  priorMat = priorMat,
+  pathwaySelection = "fast",
+  alpha = 0.9,
+  maxPath = 10,
+  nfolds = 5,
+  binary = FALSE,
+  refit = TRUE
+)
 }

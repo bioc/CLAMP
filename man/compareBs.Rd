@@ -19,12 +19,16 @@ compareBs(
 \item{res1, }{res2 Result objects or matrices containing factor loadings.
 If a list, must contain element \code{B}; if of class \code{"rsvd"}, \code{t(res$v)} is used.}
 
+\item{res2}{Second result object or matrix to compare against.}
+
 \item{target}{Numeric matrix of target variables (samples × targets).}
 
 \item{method}{Character, one of \code{"p"}, \code{"s"}, \code{"a"}, or \code{"t"}, indicating
 Pearson, Spearman, AUC, or t-statistic comparison.}
 
 \item{xlab, }{ylab Labels for x and y axes in the plot.}
+
+\item{ylab}{Label for y-axis (used in plot).}
 
 \item{stat.method}{Statistical test to compare correlations (\code{"t"} or \code{"wilcox"}).}
 
@@ -41,4 +45,20 @@ A list with:
 Compares correspondence between two result matrices (e.g., factor loadings)
 across multiple targets using correlation, AUC, or t-statistics.
 Produces a paired comparison plot and summary statistics.
+}
+\examples{
+set.seed(123)
+# Simulated example with 50 genes × 20 samples
+Y <- matrix(rnorm(50 * 20), nrow = 50, ncol = 20)
+
+# Run two CLAMP-like decompositions (here using simple SVD)
+svd1 <- rsvd::rsvd(Y, k = 5)
+svd2 <- rsvd::rsvd(Y + matrix(rnorm(50 * 20, 0, 0.1), 50, 20), k = 5)
+
+# Define a target variable (e.g., binary or continuous trait)
+target <- matrix(rnorm(20 * 3), ncol = 3)
+colnames(target) <- c("Trait1", "Trait2", "Trait3")
+
+# Compare the two sets of embeddings
+res <- compareBs(svd1, svd2, target, method = "p", xlab = "SVD1", ylab = "SVD2")
 }

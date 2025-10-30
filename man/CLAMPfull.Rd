@@ -36,7 +36,7 @@ CLAMPfull(
   var.prior = TRUE,
   Uscale = FALSE,
   robust.vp = TRUE,
-  use_cpp = F
+  use_cpp = FALSE
 )
 }
 \arguments{
@@ -93,6 +93,8 @@ CLAMPfull(
 
 \item{refitEvery}{Frequency (in U updates) of full refits. Default: 3.}
 
+\item{useSE}{Logical; whether to use the 1-standard-error rule for internal glmnet fitting. Default is FALSE.}
+
 \item{var.prior}{Logical; if \code{TRUE}, enables adaptive variance prior updates for Z.
 Default: \code{TRUE}.}
 
@@ -100,7 +102,7 @@ Default: \code{TRUE}.}
 
 \item{robust.vp}{Logical; winsorize prior-predicted Z2 values to reduce outlier effects. Default: \code{TRUE}.}
 
-\item{delta.method}{Logical; use delta method for for Z updates. Good for large datasets.  Default: \code{FALSE}.}
+\item{use_cpp}{Logical; if TRUE, use C++ implementation for Z updates. Default is FALSE.}
 }
 \value{
 A list with elements:
@@ -136,9 +138,19 @@ enabled, masks 20\% of gene–pathway associations per column to estimate pathwa
 (reported via AUC and p-values).
 }
 \examples{
-mat <- matrix(rnorm(100), 10, 10)
-base <- CLAMPbase(mat, k = 5)
-prior <- matrix(sample(0:1, 40, TRUE), 10, 4)
-fit <- CLAMPfull(Y = mat, priorMat = prior, clamp.base.result = base,
-                   doCrossval = FALSE, trace = FALSE)
+set.seed(1)
+mat <- matrix(rnorm(100), nrow = 10, ncol = 10)
+base <- CLAMPbase(mat, k = 5, trace = FALSE, max.iter = 5)
+prior <- matrix(sample(0:1, 10 * 6, TRUE, prob = c(0.9, 0.1)),
+                nrow = 10, ncol = 6)
+fit <- CLAMPfull(
+  Y = mat,
+  priorMat = prior,
+  clamp.base.result = base,
+  doCrossval = FALSE,
+  adaptive.p = 0,
+  max.U.updates = 0,
+  max.iter = 1,
+  trace = FALSE
+)
 }

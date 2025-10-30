@@ -18,3 +18,14 @@ A numeric matrix of the same dimensions as \code{M}, winsorized per column.
 For each column, replaces values greater than the k-th largest
 entry with that threshold.
 }
+\examples{
+set.seed(123)
+M <- matrix(rnorm(20 * 5, mean = 0, sd = 2), nrow = 20,
+            dimnames = list(paste0("Gene", 1:20), paste0("S", 1:5)))
+
+# Display column maxima before winsorization
+apply(M, 2, max)
+
+# Winsorize each column by capping top 3 values
+M_winsor <- winsor_topk(M, k = 3)
+}

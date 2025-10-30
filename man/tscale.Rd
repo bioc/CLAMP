@@ -20,7 +20,7 @@ standard deviation 1. Missing values are ignored in the computation
 of the mean and standard deviation.
 }
 \examples{
-mat <- matrix(1:9, nrow = 3)
+mat <- matrix(seq_len(9), nrow = 3)
 tscale(mat)
 
 }

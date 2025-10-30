@@ -1,24 +1,47 @@
 ---
-title: "Small Data Example"
-author: "Generated Report"
-output: rmarkdown::html_vignette
+title: "Analyzing a small RNA-Seq dataset with CLAMP"
+author: "Maria Chikina"
+package: CLAMP
+output: 
+  BiocStyle::html_document:
+    fig_width: 7
+    fig_height: 5
 vignette: >
-  %\VignetteIndexEntry{Small Data Example}
+  %\VignetteIndexEntry{Analyzing a small RNA-Seq dataset with CLAMP}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
 
+  
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, cache=F)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, cache=FALSE)
 library(CLAMP)
-
 ```
+
+# Overview
+
+This vignette provides a small-scale example demonstrating the main workflow of the **CLAMP** package  
+(**C**ompressed **L**atent-variable **A**pproach for **M**assive data **P**rocessing).  
+CLAMP is designed to extract interpretable latent variables from high-dimensional transcriptomic data by combining:
+
+1. **Unsupervised matrix factorization** (`CLAMPbase`) for dimensionality reduction, and  
+2. **Pathway-guided refinement** (`CLAMPfull`) that integrates biological prior knowledge to improve interpretability.
+
+In this example, we analyze a small human whole blood RNA-Seq dataset provided within the package.  
+We illustrate how to:
+
+- Load and normalize the data,  
+- Incorporate prior knowledge from public databases (e.g., KEGG, CellMarker),  
+- Fit both the baseline and extended CLAMP models, and  
+- Compare the results across implementations, including memory-efficient **Filebacked Big Matrix (FBM)** input.
+
 
 ## 1. Load Data and Normalize
 
 ```{r}
 data("dataWholeBlood")
 data("majorCellTypes")
+data('celltypeTargets')
 
 # Scale each gene to mean 0 and variance 1
 dataWholeBlood <- tscale(dataWholeBlood)
@@ -67,26 +90,30 @@ set.seed(1);dataWholeBlood.svd=rsvd::rsvd(dataWholeBlood)
 suppressMessages({
   wb.clamp.base <- CLAMPbase(
     dataWholeBlood,
- #   k = 25,
     svdres = dataWholeBlood.svd,
     trace = FALSE,
     adaptive.p = 0.05
   )
 })
 ```
+
 ```{r}
 # Fit variance-prior extended CLAMP model
 suppressMessages({
-  wb.clamp.full.vp <- CLAMPfullVP(
+  wb.clamp.full.vp <- CLAMPfull(
     dataWholeBlood,
     priorMat = matchedPathsWB,
     clamp.base.result = wb.clamp.base,
-    trace = TRUE, use_cpp = T
+    trace = TRUE, use_cpp = TRUE
   )
 })
 ```
 
 ## 5. Compare Models
+
+This plot compares the maximum Spearman correlation for each major blood cell type between the baseline (`CLAMPbase`) and the prior-guided (`CLAMPfull`) models.  
+Points above the red dashed line indicate improved correspondence when biological priors are included.  
+Most cell types show higher correlations under `CLAMPfull`, suggesting that integrating pathway information helps capture more biologically meaningful latent variables.
 
 ```{r fig.width=6, fig.height=5}
 output <- compareBs(
@@ -94,7 +121,7 @@ output <- compareBs(
   wb.clamp.full.vp,
   celltypeTargets,
   "CLAMPbase",
-  "CLAMPfullVP",
+  "CLAMPfull",
   m = "s"
 )
 
@@ -108,14 +135,15 @@ knitr::kable(output$df, format = "markdown")
 ```
 
 ## 7. Test FBM functionality
+
 ```{r}
 dataWholeBloodFBM=bigstatsr::as_FBM(dataWholeBlood)
 suppressMessages({
-  wb.clamp.full.vp.fbm <- CLAMPfullVP(
+  wb.clamp.full.fbm <- CLAMPfull(
     dataWholeBloodFBM,
     priorMat = matchedPathsWB,
     clamp.base.result = wb.clamp.base,
-    trace = TRUE, use_cpp = T
+    trace = TRUE, use_cpp = TRUE
   )
 })
 
@@ -126,12 +154,18 @@ Results are the same!
 ```{r fig.width=6, fig.height=5}
 output <- compareBs(
   wb.clamp.base,
-  wb.clamp.full.vp.fbm,
+  wb.clamp.full.fbm,
   celltypeTargets,
   "CLAMPbase",
-  "CLAMPfullVP",
+  "CLAMPfull",
   m = "s"
 )
 
 output$plot
+```
+
+# Session Information
+
+```{r session-info}
+sessionInfo()
 ```

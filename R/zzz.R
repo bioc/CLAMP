@@ -16,8 +16,11 @@
 #' @importFrom ggrepel geom_text_repel
 #' @importFrom rlang .data
 #' @importFrom dplyr filter mutate select arrange group_by ungroup summarize %>%
-
-NULL
+#' @importFrom methods show
+#' @importFrom stats lm wilcox.test
 
 # silence NSE notes from ggplot/data.frame column names
 utils::globalVariables(c("Cor1", "Cor2", "Label"))
+utils::globalVariables(c("iter.full.start"))
+
+NULL

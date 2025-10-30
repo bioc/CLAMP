@@ -52,8 +52,33 @@ Produces a combined heatmap showing expression, pathway membership,
 and optionally Z-loadings for top genes per LV using ComplexHeatmap.
 }
 \examples{
-\dontrun{
-plotTopZ_Complex(clampRes, expr_data, priorMat, top = 15, index = 1:5, Zheat = TRUE)
-}
+library(ComplexHeatmap)
+library(Matrix)
 
+# Simulate small CLAMP-like results
+set.seed(123)
+genes <- paste0("Gene", 1:100)
+samples <- paste0("S", 1:20)
+lvs <- paste0("LV", 1:3)
+
+# Simulated Z (gene loadings) and U (pathway loadings)
+Z <- matrix(rnorm(100 * 3), nrow = 100, dimnames = list(genes, lvs))
+U <- matrix(abs(rnorm(50 * 3)), nrow = 50,
+            dimnames = list(paste0("Path", 1:50), lvs))
+
+# Expression data
+expr_data <- matrix(rnorm(100 * 20), nrow = 100,
+                    dimnames = list(genes, samples))
+
+# Binary gene × pathway matrix
+priorMat <- matrix(sample(0:1, 100 * 50, replace = TRUE, prob = c(0.9, 0.1)),
+                   nrow = 100, ncol = 50,
+                   dimnames = list(genes, paste0("Path", 1:50)))
+
+# Create a CLAMP-like result list
+clampRes <- list(Z = Z, U = U)
+
+# Plot top genes and pathway memberships
+plotTopZ_Complex(clampRes, expr_data, priorMat,
+                 top = 5, top.pathway = 3, index = 1:2, Zheat = TRUE)
 }

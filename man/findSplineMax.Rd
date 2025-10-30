@@ -26,7 +26,7 @@ A named list with components:
 Find the location of the maximum of a smoothing spline
 }
 \examples{
-x <- 1:10
+x <- seq_len(10)
 y <- sin(x) + rnorm(10, 0, 0.1)
 findSplineMax(x, y)
 

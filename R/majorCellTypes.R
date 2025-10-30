@@ -1,16 +1,21 @@
 #' Major cell-type annotations
 #'
-#' A factor (or character) vector annotating samples by major cell type.
+#' A factor vector annotating samples by major cell type.
+#' This dataset provides cell-type labels corresponding to each sample
+#' in the reference expression matrix.
 #'
-#' @format A vector of length N with levels for major cell types.
-#' @usage majorCellTypes
+#' @format A factor (or character) vector of length N,
+#'   where each element corresponds to a sample and indicates its major cell type.
+#'
+#' @usage data(majorCellTypes)
+#'
 #' @keywords datasets
 #' @docType data
 #' @name majorCellTypes
 #' @aliases majorCellTypes
+#'
+#' @return A factor (or character) vector of major cell-type labels.
+#'
 #' @examples
 #' data(majorCellTypes)
-#' table(majorCellTypes)
-#' @format A data.frame with columns celltype and genes.
-#' @return A data.frame of major cell type signatures.
 "majorCellTypes"

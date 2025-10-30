@@ -52,7 +52,7 @@ allAgainstAllAUCs <- function(B, target) {
 #' has zero variance, it is returned unchanged.
 #'
 #' @examples
-#' mat <- matrix(1:9, nrow = 3)
+#' mat <- matrix(seq_len(9), nrow = 3)
 #' tscale(mat)
 #'
 #' @seealso [base::scale()]
@@ -757,7 +757,7 @@ cpmCLAMPFBM <- function(fbm_counts, block_size = 1000, ncores = 1) {
 #'   \item{y}{The corresponding maximum fitted y value.}
 #' }
 #' @examples
-#' x <- 1:10
+#' x <- seq_len(10)
 #' y <- sin(x) + rnorm(10, 0, 0.1)
 #' findSplineMax(x, y)
 #'
@@ -821,7 +821,7 @@ getScaleFromSVs <- function(sv, n, min_r2 = 0.95) {
   }
   if (k ==n){
     #drop the last few
-    sv=sv[1:(k-5)]
+    sv <- sv[seq_len(k-5)]
     k <- length(sv)
   }
   fallback <- sv[ceiling(0.75 * k)]
@@ -842,23 +842,23 @@ getScaleFromSVs <- function(sv, n, min_r2 = 0.95) {
   }
 
   if (best_r2 < min_r2){
-    scale=fallback
-    k=NULL
+    scale <- fallback
+    k <- NULL
     return(list(scale=scale))
   }
 
 
   x <- (best_drop + 1):k
   fit <- lm(sv[x] ~ x)
-  y_pred <- predict(fit, newdata = data.frame(x = 1:n))
+  y_pred <- predict(fit, newdata = data.frame(x = seq_len(n)))
 
   if (any(y_pred < 0)){
-    scale=fallback
-    k=NULL
+    scale <- fallback
+    k <- NULL
     return(list(scale=scale))
   }
-  scale=median(y_pred)
-  k=best_drop
+  scale <- median(y_pred)
+  k <- best_drop
   return(list(scale=scale, k=k))
 }
 

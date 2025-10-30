@@ -21,3 +21,10 @@ Matrix product of \code{mat1} and \code{mat2}.
 Multiplies two matrices, using optimized multiplication if the first
 is a Filebacked Big Matrix (FBM).
 }
+\examples{
+set.seed(123)
+mat1 <- matrix(rnorm(20), nrow = 4)
+mat2 <- matrix(rnorm(15), nrow = 5)
+res1 <- mat_mult(mat1, mat2)
+res1
+}

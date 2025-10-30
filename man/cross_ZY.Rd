@@ -18,3 +18,17 @@ A numeric matrix giving Z^T Y.
 Computes \eqn{Z^T Y}, handling FBM objects from bigstatsr
 as well as base R matrices.
 }
+\examples{
+set.seed(123)
+
+genes <- 40
+samples <- 10
+k <- 4
+
+Y <- matrix(rnorm(genes * samples), nrow = genes)
+Z <- matrix(rnorm(genes * k), nrow = genes)
+
+# Compute Z^T Y
+res1 <- cross_ZY(Y, Z)
+dim(res1)   # k × samples
+}

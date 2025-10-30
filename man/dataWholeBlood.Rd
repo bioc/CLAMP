@@ -5,23 +5,20 @@
 \alias{dataWholeBlood}
 \title{Whole-blood reference expression matrix}
 \format{
-A numeric matrix with G genes and N samples.
-Row names are gene symbols; column names are sample IDs.
-
-A numeric matrix with genes as rows and samples as columns.
+A numeric matrix with G genes (rows) and N samples (columns).
+Row names are gene symbols, and column names are sample IDs.
 }
 \usage{
-dataWholeBlood
+data(dataWholeBlood)
 }
 \value{
-A matrix of expression values.
+A numeric matrix of expression values.
 }
 \description{
 A numeric matrix of whole-blood gene expression
-(rows = genes, cols = samples).
+where rows correspond to genes and columns to samples.
 }
 \examples{
 data(dataWholeBlood)
-dim(dataWholeBlood)
 }
 \keyword{datasets}

@@ -12,7 +12,8 @@
 #' @param xlab, ylab Labels for x and y axes in the plot.
 #' @param stat.method Statistical test to compare correlations (`"t"` or `"wilcox"`).
 #' @param oneToOne Logical, whether to apply one-to-one masking of associations.
-#'
+#' @param res2 Second result object or matrix to compare against.
+#' @param ylab Label for y-axis (used in plot).
 #' @return A list with:
 #' \describe{
 #'   \item{plot}{A ggplot object comparing maximal correlations across targets.}
@@ -22,6 +23,21 @@
 #' @importFrom matrixStats colRanks
 #' @importFrom ggplot2 ggplot aes geom_point geom_abline  labs annotate theme_minimal
 #' @export
+#' @examples
+#' set.seed(123)
+#' # Simulated example with 50 genes × 20 samples
+#' Y <- matrix(rnorm(50 * 20), nrow = 50, ncol = 20)
+#' 
+#' # Run two CLAMP-like decompositions (here using simple SVD)
+#' svd1 <- rsvd::rsvd(Y, k = 5)
+#' svd2 <- rsvd::rsvd(Y + matrix(rnorm(50 * 20, 0, 0.1), 50, 20), k = 5)
+#' 
+#' # Define a target variable (e.g., binary or continuous trait)
+#' target <- matrix(rnorm(20 * 3), ncol = 3)
+#' colnames(target) <- c("Trait1", "Trait2", "Trait3")
+#'
+#' # Compare the two sets of embeddings
+#' res <- compareBs(svd1, svd2, target, method = "p", xlab = "SVD1", ylab = "SVD2")
 compareBs <- function(res1, res2, target, method = "p", xlab = "1", ylab = "2",
                       stat.method = "t", oneToOne = TRUE) {
 
@@ -46,20 +62,27 @@ compareBs <- function(res1, res2, target, method = "p", xlab = "1", ylab = "2",
   B2 <- B2[, noNA, drop = FALSE]
   target <- target[noNA, , drop = FALSE]
 
+  # Only correlation-based comparison supported
   if (method %in% c("s", "p")) {
     mat1 <- cor(t(B1), target, method = method)
     mat2 <- cor(t(B2), target, method = method)
-  } else if (method == "a") {
-    mat1 <- allAgainstAllAUCs(t(B1), target)
-    mat2 <- allAgainstAllAUCs(t(B2), target)
-  } else if (method == "t") {
-    mat1 <- allAgainstAllTstats(t(B1), target)
-    mat2 <- allAgainstAllTstats(t(B2), target)
   }
+
+  # if (method %in% c("s", "p")) {
+  #   mat1 <- cor(t(B1), target, method = method)
+  #   mat2 <- cor(t(B2), target, method = method)
+  # } else if (method == "a") {
+  #   mat1 <- allAgainstAllAUCs(t(B1), target)
+  #   mat2 <- allAgainstAllAUCs(t(B2), target)
+  # } else if (method == "t") {
+  #   mat1 <- allAgainstAllTstats(t(B1), target)
+  #   mat2 <- allAgainstAllTstats(t(B2), target)
+  # }
+
   if (inherits(res1, "rsvd"))
-    mat1=abs(mat1)
+    mat1 <- abs(mat1)
   if (inherits(res2, "rsvd"))
-    mat1=abs(mat1)
+    mat1 <- abs(mat1)
   mat1[is.na(mat1)] <- 0
   mat2[is.na(mat2)] <- 0
   if (oneToOne) {
@@ -97,14 +120,19 @@ compareBs <- function(res1, res2, target, method = "p", xlab = "1", ylab = "2",
 
   pl <- ggplot2::ggplot(df, ggplot2::aes(x = Cor1, y = Cor2, label = Label)) +
     ggplot2::geom_point() +
-    ggplot2::geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red", linewidth = 1) +
+    ggplot2::geom_abline(
+      slope = 1, intercept = 0, 
+      linetype = "dashed", color = "red", linewidth = 1
+    ) +
     ggrepel::geom_text_repel() +
     ggplot2::labs(
-      x = paste("Max", method_label, xlab),
-      y = paste("Max", method_label, ylab)
+      x = sprintf("Max %s %s", method_label, xlab),
+      y = sprintf("Max %s %s", method_label, ylab)
     ) +
-    ggplot2::annotate("text", x = -Inf, y = Inf, hjust = -0.1, vjust = 1.1,
-                      label = paste("p =", signif(pval, 3))) +
+    ggplot2::annotate(
+      "text", x = -Inf, y = Inf, hjust = -0.1, vjust = 1.1,
+      label = sprintf("p = %.3g", pval)
+    ) +
     ggplot2::theme_minimal()
 
   if (is.list(res1) && !is.null(res1$Z)) {
@@ -175,17 +203,41 @@ oneToOneMask <- function(cc) {
 #' @param seed Random seed for column subsampling.
 #'
 #' @return Invisibly returns the drawn ComplexHeatmap object.
-#'
-#' @examples
-#' \dontrun{
-#' plotTopZ_Complex(clampRes, expr_data, priorMat, top = 15, index = 1:5, Zheat = TRUE)
-#' }
-#'
 #' @import ComplexHeatmap
 #' @import circlize
 #' @importFrom stats setNames
 #' @importFrom Matrix rowSums
 #' @export
+#' @examples
+#' library(ComplexHeatmap)
+#' library(Matrix)
+#'
+#' # Simulate small CLAMP-like results
+#' set.seed(123)
+#' genes <- paste0("Gene", 1:100)
+#' samples <- paste0("S", 1:20)
+#' lvs <- paste0("LV", 1:3)
+#'
+#' # Simulated Z (gene loadings) and U (pathway loadings)
+#' Z <- matrix(rnorm(100 * 3), nrow = 100, dimnames = list(genes, lvs))
+#' U <- matrix(abs(rnorm(50 * 3)), nrow = 50,
+#'             dimnames = list(paste0("Path", 1:50), lvs))
+#'
+#' # Expression data
+#' expr_data <- matrix(rnorm(100 * 20), nrow = 100,
+#'                     dimnames = list(genes, samples))
+#'
+#' # Binary gene × pathway matrix
+#' priorMat <- matrix(sample(0:1, 100 * 50, replace = TRUE, prob = c(0.9, 0.1)),
+#'                    nrow = 100, ncol = 50,
+#'                    dimnames = list(genes, paste0("Path", 1:50)))
+#'
+#' # Create a CLAMP-like result list
+#' clampRes <- list(Z = Z, U = U)
+#'
+#' # Plot top genes and pathway memberships
+#' plotTopZ_Complex(clampRes, expr_data, priorMat,
+#'                  top = 5, top.pathway = 3, index = 1:2, Zheat = TRUE)
 plotTopZ_Complex <- function(clampRes, data, priorMat, top = 10, top.pathway = 5,
                              index = NULL, allLVs = FALSE, Zheat = FALSE,
                              LV.names = NULL, max.genes = 100, max.col = 50, seed = 1234) {
@@ -195,7 +247,6 @@ plotTopZ_Complex <- function(clampRes, data, priorMat, top = 10, top.pathway = 5
     stop("Too many genes. Reduce number of LVs or 'top', or increase 'max.genes'.")
 
   if (ncol(data) > max.col) {
-    set.seed(seed)
     data <- data[, sample(ncol(data), max.col)]
   }
 
@@ -212,12 +263,18 @@ plotTopZ_Complex <- function(clampRes, data, priorMat, top = 10, top.pathway = 5
   nn <- sort(unique(nn))
   data_sub <- t(scale(t(data[nn, , drop = FALSE])))
 
-  nnpath <- sapply(seq_along(ii), function(i) {
-    gene_idx <- match(nn, rownames(priorMat))
-    col_idx <- which(clampRes$U[, ii[i]] > 0)
-    Matrix::rowSums(priorMat[gene_idx, col_idx, drop = FALSE]) > 0
-  })
+  nnpath <- vapply(
+    seq_along(ii),
+    function(i) {
+      gene_idx <- match(nn, rownames(priorMat))
+      col_idx <- which(clampRes$U[, ii[i]] > 0)
+      Matrix::rowSums(priorMat[gene_idx, col_idx, drop = FALSE]) > 0
+    },
+    logical(length(nn))  # expected output type
+  )
+
   nnpath <- rowSums(nnpath) > 0
+
   gene_annot <- ComplexHeatmap::rowAnnotation(
     present = nnpath,
     col = list(present = c("TRUE" = "black", "FALSE" = "beige"))

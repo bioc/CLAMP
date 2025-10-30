@@ -45,6 +45,12 @@ row_cor <- function(A, B) {
 #' (only used if mat1 is an FBM). Default is 1.
 #' @return Matrix product of \code{mat1} and \code{mat2}.
 #' @export
+#' @examples
+#' set.seed(123)
+#' mat1 <- matrix(rnorm(20), nrow = 4)
+#' mat2 <- matrix(rnorm(15), nrow = 5)
+#' res1 <- mat_mult(mat1, mat2)
+#' res1
 mat_mult <- function(mat1, mat2, ncores = 1) {
   is_fbm <- inherits(mat1, "FBM")
   if (is_fbm) {
@@ -154,19 +160,39 @@ binarizeTop <- function(Z, top, keepVals = TRUE) {
 #' @param Uprev (Optional) Previous U matrix to reuse. In this mode only the columns of \code{U}
 #' that are all zero are estimated. Used internally in \code{CLAMP}.
 #' @param ... Additional arguments passed to \code{glmnet()} or \code{cv.glmnet()}.
-#'
+#' @param useAUC Logical; whether to compute pathway–LV associations using AUC (default TRUE) instead of OLS.
+#' @param intercept Logical; whether to include an intercept term in glmnet models. Default is TRUE.
 #' @return A list with one element:
 #' \describe{
 #'   \item{\code{U}}{A matrix of loadings (features x components).
 #'    Columns are named \code{LV1}, \code{LV2}, ...}
 #' }
-#'
-#'
 #' @export
+#' @examples
+#' set.seed(123)
+#' genes <- paste0("G", 1:200)
+#' lvs   <- paste0("LV", 1:4)
+#' paths <- paste0("Path", 1:60)
+#'
+#' Z <- matrix(rnorm(200 * 4), nrow = 200, dimnames = list(genes, lvs))
+#'
+#' priorMat <- matrix(rbinom(200 * 60, 1, 0.07),
+#'                    nrow = 200, dimnames = list(genes, paths))
+#'
+#' fit1 <- solveU(
+#'   Z = Z,
+#'   priorMat = priorMat,
+#'   pathwaySelection = "fast",
+#'   alpha = 0.9,
+#'   maxPath = 10,
+#'   nfolds = 5,
+#'   binary = FALSE,
+#'   refit = TRUE
+#' )
 solveU <- function(
     Z, Chat = NULL, priorMat, penalty.factor, pathwaySelection = "fast",
     alpha = 0.9, maxPath = 10, nfolds = 5, useSE = FALSE, top = NULL,
-    binary = FALSE, nlambda = 20, scale = TRUE, refit = TRUE, Uprev = NULL, useAUC=T, intercept=T,...) {
+    binary = FALSE, nlambda = 20, scale = TRUE, refit = TRUE, Uprev = NULL, useAUC=TRUE, intercept=TRUE,...) {
   if (nrow(Z) != nrow(priorMat)) {
     cm <- commonRows(Z, priorMat)
     Z <- Z[cm, ]
@@ -189,7 +215,7 @@ solveU <- function(
     Ur <- Chat %*% Z # get U by OLS
   }
   else{
-    Ur=t(allAgainstAllAUCs(Z, priorMat))
+    Ur <- t(allAgainstAllAUCs(Z, priorMat))
   }
   Ur <- apply(-Ur, 2, rank) # rank
   Urm <- apply(Ur, 1, min)
@@ -638,8 +664,9 @@ CLAMPbase <- function(
   message("****")
 
   if (is.null(k)) {
-    k <- min(50, min(dim(Y)) - 1)  # safe default upper bound
-    message(paste0("Initial k not provided, temporarily set to ", k))
+    n_genes   <- nrow(Y)
+    n_samples <- ncol(Y)
+    k <- max(2, min(n_genes, n_samples) - 1)
   }
   
   if (is.null(svdres) && is.null(B)) {
@@ -672,18 +699,18 @@ CLAMPbase <- function(
   }
   svdres <- rotateSVD(svdres)
   if(k>20 | is.null(k)){
-    scale.res=getScaleFromSVs(svdres$d, ncol(Y))
+    scale.res <- getScaleFromSVs(svdres$d, ncol(Y))
 
-    k=min(floor(scale.res$k*1.5), ncol(Y)-5)
+    k <- min(floor(scale.res$k*1.5), ncol(Y)-5)
 
 
-    d=scale.res$scale
+    d <- scale.res$scale
   }
   else{
-    d=svdres$d[k]
+    d <- svdres$d[k]
 
   }
-  message(paste0("k is set to ", k))
+  message("k is set to", k)
   if (is.null(L1)) {
     # L1 <- svdres$d[k] * scale
     L1 <- d * scale
@@ -696,7 +723,7 @@ CLAMPbase <- function(
     L2 <- d * scale
   }
   L2k <- L2 * diag(k)
-  #    L1=svdres$d[k]/2*scale
+  #    L1 <- svdres$d[k]/2*scale
   message("L1 is set to ", L1)
   message("L2 is set to ", L2)
 
@@ -708,8 +735,8 @@ CLAMPbase <- function(
 
     # alternative initializations
     # seem to be not as good
-    #   B=t(svdres$v[1:ncol(Y), 1:k]%*%diag((svdres$d[1:k])))
-    #   B=t(svdres$v[1:ncol(Y), 1:k])
+    #   B <- t(svdres$v[seq_len(ncol(Y)), seq_len(k)] %*% diag(svdres$d[seq_len(k)]))
+    #   B <- t(svdres$v[seq_len(ncol(Y)), seq_len(k)])
   } else {
     message("B given")
   }
@@ -1358,6 +1385,16 @@ num.pc <- function(data, method = c("elbow", "permutation"), B = 20, seed = NULL
 #' @param k Integer; number of top elements to cap. Must be >= 1 and <= nrow(M).
 #' @return A numeric matrix of the same dimensions as \code{M}, winsorized per column.
 #' @export
+#' @examples
+#' set.seed(123)
+#' M <- matrix(rnorm(20 * 5, mean = 0, sd = 2), nrow = 20,
+#'             dimnames = list(paste0("Gene", 1:20), paste0("S", 1:5)))
+#'
+#' # Display column maxima before winsorization
+#' apply(M, 2, max)
+#'
+#' # Winsorize each column by capping top 3 values
+#' M_winsor <- winsor_topk(M, k = 3)
 winsor_topk <- function(M, k) {
   if (nrow(M) < 10 * k) return(M)
   stopifnot(is.matrix(M), is.numeric(M), k >= 1L, k <= nrow(M))
@@ -1378,6 +1415,19 @@ winsor_topk <- function(M, k) {
 #' @return A numeric matrix giving Z^T Y.
 #' @importFrom Matrix t
 #' @export
+#' @examples
+#' set.seed(123)
+#'
+#' genes <- 40
+#' samples <- 10
+#' k <- 4
+#'
+#' Y <- matrix(rnorm(genes * samples), nrow = genes)
+#' Z <- matrix(rnorm(genes * k), nrow = genes)
+#'
+#' # Compute Z^T Y
+#' res1 <- cross_ZY(Y, Z)
+#' dim(res1)   # k × samples
 cross_ZY <- function(Y, Z) {
   if (inherits(Y, "FBM")) {
     Matrix::t(bigstatsr::big_cprodMat(Y, as.matrix(Z)))
@@ -1396,6 +1446,21 @@ cross_ZY <- function(Y, Z) {
 #' @return A numeric matrix of size k x samples.
 #' @importFrom Matrix crossprod
 #' @export
+#' @examples
+#' set.seed(123)
+#'
+#' genes <- paste0("Gene", 1:50)
+#' samples <- paste0("S", 1:20)
+#' k <- 5
+#'
+#' Y <- matrix(rnorm(50 * 20), nrow = 50, dimnames = list(genes, samples))
+#' Z <- matrix(rnorm(50 * k),  nrow = 50, dimnames = list(genes, paste0("LV", 1:k)))
+#'
+#' lambda <- 0.1
+#' L2k <- diag(lambda, k)
+#'
+#' # Solve for B = (Z'Z + L2)^(-1) Z'Y
+#' B <- ridge_B(Y, Z, L2k)
 ridge_B <- function(Y, Z, L2k) {
   Zm  <- as.matrix(Z)
   ZtZ <- Matrix::crossprod(Zm)   # Z^T Z
@@ -1449,8 +1514,8 @@ ridge_B <- function(Y, Z, L2k) {
 #'   Default: \code{TRUE}.
 #' @param Uscale Logical; whether to scale U columns. Default: \code{FALSE}.
 #' @param robust.vp Logical; winsorize prior-predicted Z2 values to reduce outlier effects. Default: \code{TRUE}.
-#' @param delta.method Logical; use delta method for for Z updates. Good for large datasets.  Default: \code{FALSE}.
-#'
+#' @param useSE Logical; whether to use the 1-standard-error rule for internal glmnet fitting. Default is FALSE.
+#' @param use_cpp Logical; if TRUE, use C++ implementation for Z updates. Default is FALSE.
 #' @return A list with elements:
 #' \describe{
 #'   \item{\code{B}}{LV loadings on samples (k × samples)}
@@ -1472,11 +1537,21 @@ ridge_B <- function(Y, Z, L2k) {
 #' (reported via AUC and p-values).
 #'
 #' @examples
-#' mat <- matrix(rnorm(100), 10, 10)
-#' base <- CLAMPbase(mat, k = 5)
-#' prior <- matrix(sample(0:1, 40, TRUE), 10, 4)
-#' fit <- CLAMPfull(Y = mat, priorMat = prior, clamp.base.result = base,
-#'                    doCrossval = FALSE, trace = FALSE)
+#' set.seed(1)
+#' mat <- matrix(rnorm(100), nrow = 10, ncol = 10)
+#' base <- CLAMPbase(mat, k = 5, trace = FALSE, max.iter = 5)
+#' prior <- matrix(sample(0:1, 10 * 6, TRUE, prob = c(0.9, 0.1)),
+#'                 nrow = 10, ncol = 6)
+#' fit <- CLAMPfull(
+#'   Y = mat,
+#'   priorMat = prior,
+#'   clamp.base.result = base,
+#'   doCrossval = FALSE,
+#'   adaptive.p = 0,
+#'   max.U.updates = 0,
+#'   max.iter = 1,
+#'   trace = FALSE
+#' )
 #' @export
 CLAMPfull <- function(
     Y, priorMat, Chat=NULL,svdres = NULL, clamp.base.result = NULL, k = NULL, L1 = NULL, L2 = NULL,
@@ -1485,7 +1560,7 @@ CLAMPfull <- function(
     minGenes = 0, tol = 5e-4, seed = 123456, allGenes = FALSE, rseed = NULL,
     max.U.updates = Inf, pathwaySelection = c("fast", "complete"),  multiplier = 5,
     adaptive.p = 0.05, useNNLS = TRUE, useRaw = TRUE, refitEvery = 3,
-    useSE = FALSE, var.prior = TRUE, Uscale = FALSE, robust.vp = TRUE, use_cpp=F) {
+    useSE = FALSE, var.prior = TRUE, Uscale = FALSE, robust.vp = TRUE, use_cpp=FALSE) {
   if (is.infinite(max.U.updates)) max.U.updates <- max.iter
   getT <- function(x) -stats::quantile(x[x < 0], adaptive.p)
   pathwaySelection <- match.arg(pathwaySelection, c("fast", "complete"))
@@ -1546,7 +1621,6 @@ CLAMPfull <- function(
     priorMat <- priorMat[, -iibad, drop = FALSE]
     message("Removed ", length(iibad), " pathways with too few genes")
   }
-  set.seed(seed)
   ## Cross-validation masking
   if (doCrossval) {
     priorMatCV <- as.matrix(priorMat)
@@ -1607,7 +1681,7 @@ CLAMPfull <- function(
   Z <- clamp.base.result$Z
   if (is.null(L1)) L1 <- clamp.base.result$L1
   if (is.null(L2)) L2 <- clamp.base.result$L2
-  message(paste0("L1=", L1, "; L2=", L2))
+  message("L1=", L1, "; L2=", L2)
 
   if (ncol(clamp.base.result$B) == ncol(Y)) {
     B <- clamp.base.result$B
@@ -1618,7 +1692,6 @@ CLAMPfull <- function(
 
   if (!is.null(rseed)) {
     message("Using random start")
-    set.seed(rseed)
     B <- t(apply(B, 1, sample))
     Z <- apply(Z, 2, sample)
   }
@@ -1669,10 +1742,10 @@ CLAMPfull <- function(
           #  print("Fitting new")
         }
 
-        Zinput = if (useRaw) Zraw else Z
+        Zinput <- if (useRaw) Zraw else Z
         res <- solveU(Zinput, NULL, C, penalty.factor, pathwaySelection,
                       glm_alpha, maxPath, binary = FALSE, nfolds = cvn,
-                      useNNLS = useNNLS, Uprev = Uprev, useSE = useSE, scale = Uscale, useAUC = T)
+                      useNNLS = useNNLS, Uprev = Uprev, useSE = useSE, scale = Uscale, useAUC = TRUE)
 
         U <- res$U
         num.U.updates <- num.U.updates + 1
@@ -1687,7 +1760,7 @@ CLAMPfull <- function(
       } else {
         Z2 <- as.matrix(C %*% U)
         if (robust.vp) Z2 <- winsor_topk(Z2, 20)
-        Zmultiplier=getVarMultiplier(Zinput, Z2)
+        Zmultiplier <- getVarMultiplier(Zinput, Z2)
 
 
 
@@ -1706,8 +1779,7 @@ CLAMPfull <- function(
         }
 
         else {
-          for (inner.iter in 1:3) {
-            set.seed(inner.iter*iter)
+          for (inner.iter in seq_len(3)) {
             for (k_index in sample.int(k)) {
 
 
@@ -1721,7 +1793,7 @@ CLAMPfull <- function(
               delta <- newZk - Z[, k_index]
               Z[, k_index] <- newZk
 
-              Q <- Q + tcrossprod(delta, B2[k_index, ])  # rank-1: n×1 * 1×k
+              Q <- Q + tcrossprod(delta, B2[k_index, ])  # rank-1 n×1 * 1×k
 
               #if (anyNA(Z)) stop()
             } #end for k
@@ -1829,6 +1901,27 @@ CLAMPfull <- function(
 #' @return A sparse binary matrix with rows equal to \code{new.genes} and columns equal to
 #'   the union of filtered pathways from all input matrices.
 #' @export
+#' @examples
+#' set.seed(123)
+#' library(Matrix)
+#'
+#' # Simulate two small pathway matrices (genes × pathways)
+#' genes <- paste0("Gene", 1:100)
+#' pathways1 <- paste0("Path", 1:5)
+#' pathways2 <- paste0("Path", 6:10)
+#'
+#' mat1 <- matrix(sample(c(0, 1), 100 * 5, replace = TRUE, prob = c(0.9, 0.1)),
+#'                nrow = 100, ncol = 5,
+#'                dimnames = list(genes, pathways1))
+#' mat2 <- matrix(sample(c(0, 1), 100 * 5, replace = TRUE, prob = c(0.9, 0.1)),
+#'                nrow = 100, ncol = 5,
+#'                dimnames = list(genes, pathways2))
+#'
+#' # Define target genes (subset of total)
+#' new.genes <- sample(genes, 50)
+#'
+#' # Match and filter pathways with at least 5 genes
+#' matched <- getMatchedPathwayMatList(mat1, mat2, new.genes = new.genes, min.genes = 5)
 getMatchedPathwayMatList <- function(..., new.genes, min.genes = 10) {
   pathMats <- list(...)
 

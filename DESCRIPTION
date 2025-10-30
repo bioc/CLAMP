@@ -38,10 +38,10 @@ Imports:
     matrixStats,
     rlang,
     rsvd,
-    stats,
     utils,
     Rcpp,
-    BiocGenerics
+    stats,
+    methods
 Suggests:
     AnnotationDbi,
     BiocStyle,
@@ -54,15 +54,13 @@ Suggests:
     org.Hs.eg.db,
     rappdirs,
     rmarkdown,
-    testthat (>= 3.0.0),
-    CLAMPData
+    testthat (>= 3.0.0)
 LinkingTo: Rcpp, RcppArmadillo
 VignetteBuilder:  knitr
 biocViews: Software, GeneExpression, RNASeq, Transcriptomics,
     DimensionReduction, Visualization, Normalization, Pathways,
-    Preprocessing, GenePrediction
+    Preprocessing, GenePrediction, GeneTarget
 Encoding: UTF-8
-LazyData: true
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Config/testthat/edition: 3

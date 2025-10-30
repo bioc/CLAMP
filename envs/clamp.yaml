@@ -42,6 +42,7 @@ dependencies:
   - bioconductor-genomeinfodbdata
   - bioconductor-bioccheck
   - bioconductor-complexheatmap
+  - bioconductor-biocstyle
 
   # Other R utilities
   - r-plyr

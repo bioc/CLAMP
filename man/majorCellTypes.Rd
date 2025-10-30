@@ -5,21 +5,21 @@
 \alias{majorCellTypes}
 \title{Major cell-type annotations}
 \format{
-A vector of length N with levels for major cell types.
-
-A data.frame with columns celltype and genes.
+A factor (or character) vector of length N,
+where each element corresponds to a sample and indicates its major cell type.
 }
 \usage{
-majorCellTypes
+data(majorCellTypes)
 }
 \value{
-A data.frame of major cell type signatures.
+A factor (or character) vector of major cell-type labels.
 }
 \description{
-A factor (or character) vector annotating samples by major cell type.
+A factor vector annotating samples by major cell type.
+This dataset provides cell-type labels corresponding to each sample
+in the reference expression matrix.
 }
 \examples{
 data(majorCellTypes)
-table(majorCellTypes)
 }
 \keyword{datasets}

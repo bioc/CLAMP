@@ -56,3 +56,6 @@ rsconnect/
 scratch/
 
 .vscode/
+
+src/*.o
+src/*.so

@@ -26,3 +26,25 @@ restricted to \code{new.genes}, and pathways with fewer than \code{min.genes}
 overlapping genes are removed. The resulting matrices are column-bound into a
 single sparse matrix aligned to \code{new.genes}.
 }
+\examples{
+set.seed(123)
+library(Matrix)
+
+# Simulate two small pathway matrices (genes × pathways)
+genes <- paste0("Gene", 1:100)
+pathways1 <- paste0("Path", 1:5)
+pathways2 <- paste0("Path", 6:10)
+
+mat1 <- matrix(sample(c(0, 1), 100 * 5, replace = TRUE, prob = c(0.9, 0.1)),
+               nrow = 100, ncol = 5,
+               dimnames = list(genes, pathways1))
+mat2 <- matrix(sample(c(0, 1), 100 * 5, replace = TRUE, prob = c(0.9, 0.1)),
+               nrow = 100, ncol = 5,
+               dimnames = list(genes, pathways2))
+
+# Define target genes (subset of total)
+new.genes <- sample(genes, 50)
+
+# Match and filter pathways with at least 5 genes
+matched <- getMatchedPathwayMatList(mat1, mat2, new.genes = new.genes, min.genes = 5)
+}
