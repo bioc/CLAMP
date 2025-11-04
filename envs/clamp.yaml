@@ -43,6 +43,7 @@ dependencies:
   - bioconductor-bioccheck
   - bioconductor-complexheatmap
   - bioconductor-biocstyle
+  - bioconductor-experimenthubdata
 
   # Other R utilities
   - r-plyr
