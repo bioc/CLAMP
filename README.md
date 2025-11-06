@@ -13,7 +13,7 @@
 | [_devel_](http://bioconductor.org/packages/devel/bioc/html/CLAMP.html) | [![Bioconductor-devel Build Status](http://bioconductor.org/shields/build/devel/bioc/CLAMP.svg)](http://bioconductor.org/checkResults/devel/bioc-LATEST/CLAMP) | ![](http://bioconductor.org/shields/lastcommit/devel/bioc/CLAMP.svg) |
 | [_release_](http://bioconductor.org/packages/release/bioc/html/CLAMP.html) | [![Bioconductor-release Build Status](http://bioconductor.org/shields/build/release/bioc/CLAMP.svg)](http://bioconductor.org/checkResults/release/bioc-LATEST/CLAMP) | ![](http://bioconductor.org/shields/lastcommit/release/bioc/CLAMP.svg) |
 
-The goal of CLAMP (**C**ompressed **L**atent-variable **A**pproach for **M**assive data **P**rocessing) is to provide an easy-to-use package to extract interpretable latent variables from large transcriptomic datasets using biological priors.
+The goal of CLAMP (**C**urated **L**atent-variable **A**nalysis with **M**olecular **P**riors) is to provide an easy-to-use package to extract interpretable latent variables from large transcriptomic datasets using biological priors.
 
 ## Local development via Conda
 

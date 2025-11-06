@@ -587,7 +587,7 @@ crossVal <- function(clampRes, priorMat, priorMatcv) {
 
 #' CLAMP base matrix factorization
 #'
-#' Runs the core matrix factorization procedure of CLAMP (Compressed Latent-variable Approach for Massive data Processing),
+#' Runs the core matrix factorization procedure of CLAMP,
 #' decomposing the gene expression matrix \code{Y} into latent variables \code{Z} and loadings \code{B}.
 #' It supports sparse, dense, and Filebacked Big Matrices (FBM) as input and includes options for
 #' adaptive sparsity, positive constraints, and regularization.
@@ -819,7 +819,7 @@ CLAMPbase <- function(
 
 #' Full CLAMP model with prior information and cross-validation
 #'
-#' Runs the full CLAMP (Compressed Latent-variable Approach for Massive data Processing) model using a gene expression matrix
+#' Runs the full CLAMP model using a gene expression matrix
 #' and prior pathway annotation matrix. This function performs latent variable decomposition
 #' guided by prior knowledge and includes optional cross-validation to evaluate pathway associations.
 #'
@@ -1470,7 +1470,7 @@ ridge_B <- function(Y, Z, L2k) {
 }
 
 
-#' Runs the streamlined full CLAMP (Compressed Latent-variable Approach for Massive data Processing) model.
+#' Runs the streamlined full CLAMP model.
 #'
 #' This version performs latent-variable decomposition of a gene expression matrix \code{Y}
 #' guided by prior pathway annotations \code{priorMat}, with simplified and lighter regularization

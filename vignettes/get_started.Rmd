@@ -53,7 +53,7 @@ knitr::include_graphics("../man/figures/clamp.png", dpi = 800)
 
 # Introduction
 
-The CLAMP (**C**ompressed **L**atent-variable **A**pproach for **M**assive data **P**rocessing) 
+The CLAMP (**C**urated **L**atent-variable **A**nalysis with **M**olecular **P**riors) 
 package provides a two-stage framework to extract interpretable latent
 variables from high-dimensional transcriptomic data.
 It combines a standard matrix decomposition (**CLAMPbase**) with

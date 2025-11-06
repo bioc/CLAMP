@@ -21,7 +21,7 @@ library(CLAMP)
 # Overview
 
 This vignette provides a small-scale example demonstrating the main workflow of the **CLAMP** package  
-(**C**ompressed **L**atent-variable **A**pproach for **M**assive data **P**rocessing).  
+(**C**urated **L**atent-variable **A**nalysis with **M**olecular **P**riors).  
 CLAMP is designed to extract interpretable latent variables from high-dimensional transcriptomic data by combining:
 
 1. **Unsupervised matrix factorization** (`CLAMPbase`) for dimensionality reduction, and  
