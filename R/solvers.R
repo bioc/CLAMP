@@ -710,7 +710,7 @@ CLAMPbase <- function(
     d <- svdres$d[k]
 
   }
-  message("k is set to", k)
+  message("k is set to ", k)
   if (is.null(L1)) {
     # L1 <- svdres$d[k] * scale
     L1 <- d * scale
@@ -803,7 +803,7 @@ CLAMPbase <- function(
       break
     }
     if (BdiffCount > 5 && i > adaptive.iter + 10) {
-      message("stopped at iteration", i, "Bdiff is not decreasing")
+      message("stopped at iteration ", i, " Bdiff is not decreasing")
       break
     }
   }
