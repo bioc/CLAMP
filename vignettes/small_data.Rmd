@@ -70,7 +70,8 @@ data("xCell")
 
 # Match pathways to the gene space of whole blood
 matchedPathsWB <- getMatchedPathwayMatList(
-  pathMatCell, xCell,
+  pathMatCell, 
+  xCell,
   new.genes = rownames(dataWholeBlood),
   min.genes = 2
 )
@@ -80,33 +81,32 @@ matchedPathsWB <- getMatchedPathwayMatList(
 
 ```{r}
 # Compute truncated SVD for initialization
-set.seed(1);dataWholeBlood.svd=rsvd::rsvd(dataWholeBlood)
+set.seed(1)
+dataWholeBlood.svd <- rsvd::rsvd(dataWholeBlood)
 ```
 
 ## 4. Fit Baseline and Extended CLAMP Models
 
 ```{r}
 # Fit baseline CLAMP
-suppressMessages({
-  wb.clamp.base <- CLAMPbase(
-    dataWholeBlood,
-    svdres = dataWholeBlood.svd,
-    trace = FALSE,
-    adaptive.p = 0.05
-  )
-})
+wb.clamp.base <- CLAMPbase(
+  dataWholeBlood,
+  svdres = dataWholeBlood.svd,
+  trace = FALSE,
+  adaptive.p = 0.05
+)
 ```
 
 ```{r}
 # Fit variance-prior extended CLAMP model
-suppressMessages({
-  wb.clamp.full.vp <- CLAMPfull(
-    dataWholeBlood,
-    priorMat = matchedPathsWB,
-    clamp.base.result = wb.clamp.base,
-    trace = TRUE, use_cpp = TRUE
-  )
-})
+wb.clamp.full <- CLAMPfull(
+  dataWholeBlood,
+  priorMat = matchedPathsWB,
+  svdres = dataWholeBlood.svd,
+  clamp.base.result = wb.clamp.base,
+  trace = TRUE, 
+  use_cpp = TRUE
+)
 ```
 
 ## 5. Compare Models
@@ -118,7 +118,7 @@ Most cell types show higher correlations under `CLAMPfull`, suggesting that inte
 ```{r fig.width=6, fig.height=5}
 output <- compareBs(
   wb.clamp.base,
-  wb.clamp.full.vp,
+  wb.clamp.full,
   celltypeTargets,
   "CLAMPbase",
   "CLAMPfull",
@@ -137,16 +137,15 @@ knitr::kable(output$df, format = "markdown")
 ## 7. Test FBM functionality
 
 ```{r}
-dataWholeBloodFBM=bigstatsr::as_FBM(dataWholeBlood)
-suppressMessages({
-  wb.clamp.full.fbm <- CLAMPfull(
-    dataWholeBloodFBM,
-    priorMat = matchedPathsWB,
-    clamp.base.result = wb.clamp.base,
-    trace = TRUE, use_cpp = TRUE
-  )
-})
+dataWholeBloodFBM <- bigstatsr::as_FBM(dataWholeBlood)
 
+wb.clamp.full.fbm <- CLAMPfull(
+  dataWholeBloodFBM,
+  priorMat = matchedPathsWB,
+  clamp.base.result = wb.clamp.base,
+  trace = TRUE, 
+  use_cpp = TRUE
+)
 ```
 
 Results are the same!

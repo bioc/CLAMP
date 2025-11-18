@@ -9,7 +9,8 @@ CLAMPfullnVP(
   priorMat,
   svdres = NULL,
   clamp.base.result = NULL,
-  k = NULL,
+  clamp_k = NULL,
+  svd_k = NULL,
   L1 = NULL,
   L2 = NULL,
   top = NULL,
@@ -46,7 +47,11 @@ CLAMPfullnVP(
 
 \item{clamp.base.result}{Optional result from \code{CLAMPbase()} to initialize B.}
 
-\item{k}{Number of latent variables. If \code{NULL}, estimated from SVD.}
+\item{clamp_k}{Number of latent variables for CLAMP (final model rank).
+If \code{NULL}, it is chosen from the SVD via \code{getScaleFromSVs}.}
+
+\item{svd_k}{Number of singular values/components to compute in the SVD.
+If \code{NULL}, defaults to \code{max(2, min(n_genes, n_samples) - 1)}.}
 
 \item{L1}{Regularization strength for Z. If \code{NULL}, initialized from SVD or \code{clamp.base.result}.}
 
@@ -120,7 +125,7 @@ A list with the following components:
 }
 }
 \description{
-Runs the full CLAMP (Compressed Latent-variable Approach for Massive data Processing) model using a gene expression matrix
+Runs the full CLAMP model using a gene expression matrix
 and prior pathway annotation matrix. This function performs latent variable decomposition
 guided by prior knowledge and includes optional cross-validation to evaluate pathway associations.
 }
@@ -132,11 +137,11 @@ is used to hold out gene annotations in \code{priorMat} and evaluate latent vari
 \examples{
 mat <- matrix(rnorm(100), 10, 10)
 svdres <- rsvd::rsvd(mat, k = 5)
-base <- CLAMPbase(Y = mat, k = 5, svdres = svdres, trace = FALSE)
+base <- CLAMPbase(Y = mat, clamp_k = 5, svdres = svdres, trace = FALSE)
 priorMat <- matrix(1, nrow(mat), 5)
 full <- CLAMPfullnVP(
     Y = mat, priorMat = priorMat, svdres = svdres,
-    clamp.base.result = base, k = 5,
+    clamp.base.result = base, clamp_k = 5,
     doCrossval = FALSE, trace = FALSE, max.U.updates = 0
 )
 }

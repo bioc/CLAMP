@@ -16,8 +16,6 @@ test_that("CLAMPfull and returns B, Z, U", {
     adaptive.p = 0.05
   )
   
-  k_use <- ncol(base$Z)
-
   full <- CLAMPfull(
     Y = dataWholeBlood,
     priorMat = matchedPaths,

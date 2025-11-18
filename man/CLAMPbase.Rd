@@ -6,7 +6,8 @@
 \usage{
 CLAMPbase(
   Y,
-  k = NULL,
+  clamp_k = NULL,
+  svd_k = NULL,
   svdres = NULL,
   L1 = NULL,
   L2 = NULL,
@@ -27,7 +28,11 @@ CLAMPbase(
 \arguments{
 \item{Y}{Input gene expression matrix (genes x samples). Can be dense, sparse (\code{dgCMatrix}), or FBM.}
 
-\item{k}{Number of latent variables.}
+\item{clamp_k}{Number of latent variables for CLAMP (final model rank).
+If \code{NULL}, it is chosen from the SVD via \code{getScaleFromSVs}.}
+
+\item{svd_k}{Number of singular values/components to compute in the SVD.
+If \code{NULL}, defaults to \code{max(2, min(n_genes, n_samples) - 1)}.}
 
 \item{svdres}{Optional precomputed SVD result. If not supplied, it is computed internally.}
 
@@ -75,7 +80,7 @@ A list with components:
 }
 }
 \description{
-Runs the core matrix factorization procedure of CLAMP (Compressed Latent-variable Approach for Massive data Processing),
+Runs the core matrix factorization procedure of CLAMP,
 decomposing the gene expression matrix \code{Y} into latent variables \code{Z} and loadings \code{B}.
 It supports sparse, dense, and Filebacked Big Matrices (FBM) as input and includes options for
 adaptive sparsity, positive constraints, and regularization.
@@ -89,7 +94,7 @@ constraints on \code{Z}. Convergence is assessed via relative change in \code{B}
 # small toy dataset: 5 genes x 4 samples
 Y <- matrix(rnorm(5 * 4), nrow = 5, ncol = 4)
 # run a single iteration for speed
-res <- CLAMPbase(Y, k = 2, max.iter = 1, trace = FALSE)
+res <- CLAMPbase(Y, clamp_k = 2, max.iter = 1, trace = FALSE)
 # inspect dimensions of B and Z
 dim(res$B)
 dim(res$Z)

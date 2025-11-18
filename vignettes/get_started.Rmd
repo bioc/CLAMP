@@ -277,6 +277,8 @@ datatable(
     formatSignif(c("AUC", "FDR"), 3)
 ```
 
+# UPDATE WHEN FINAL VERSION
+
 In whole-blood RNA-Seq, CLAMP latent variables capture transcriptional programs central to oxygen transport, immune activity, and hematopoiesis. The leading components highlight heme metabolism, mitochondrial ATP synthesis coupled electron transport (GO:0042775), and oxidative phosphorylation (GO:0006119), which are core pathways for energy generation and oxygen delivery in blood. Heme metabolism reflects erythroid lineage differentiation and hemoglobin biosynthesis in red blood cell precursors, while mitochondrial and oxidative phosphorylation signals represent the bioenergetic demands of leukocytes and platelets during immune and hemostatic activation. Consistently, enriched signatures include Ribosome (LV2), Neutrophil and Plasma cell markers (LV19, LV23), Natural Killer cell pathways (LV12), and Erythrocyte transcriptional programs (LV27), confirming that CLAMP effectively distinguishes immune and erythroid cell–type–specific expression within peripheral blood. The GTEx signature “Whole Blood Male 70–79 Up” further validates the tissue specificity of these latent variables.
 
 # Example 2: File-Backed Matrix (Alzheimer’s Brain)
@@ -397,6 +399,8 @@ datatable(
     formatSignif(c("AUC", "FDR"), 3)
 ```
 
+# UPDATE WHEN FINAL VERSION
+
 For the Alzheimer’s brain dataset, the dominant latent variable (LV3) shows strong enrichment for GTEx tissue signatures corresponding to the “Brain – Spinal Cord (Cervical C-1)” across multiple age and sex groups (e.g., Male 50–59 Up, Female 60–69 Up; FDR ≈ 4×10⁻¹³, AUC > 0.99), confirming robust neuroanatomical tissue specificity. Additional latent variables capture complementary brain-related signatures, including Frontal Cortex (BA9) and Substantia Nigra, suggesting that CLAMP effectively recovers distinct yet biologically coherent transcriptional programs across cortical and subcortical regions. Beyond tissue enrichment, biological processes associated with these latent variables highlight mechanisms relevant to neuronal signaling and neurodegeneration, such as Cytoplasmic Translation, Neurotransmitter Secretion, Regulation of Neurotransmitter Receptor Activity, and Ubiquitin-Dependent Proteolysis, emphasizing protein homeostasis, synaptic regulation, and energy metabolism in the Alzheimer’s brain.
 
 # Example 3: Tab-Delimited Count File (Pancreatic Islets)
@@ -511,6 +515,8 @@ datatable(
 ) %>%
     formatSignif(c("AUC", "FDR"), 3)
 ```
+
+# UPDATE WHEN FINAL VERSION
 
 In pancreatic islet RNA-Seq, CLAMP latent variables robustly capture islet-specific endocrine and metabolic programs. The top latent variable aligns with the GTEx “Pancreas Female 30–39 Up” signature, confirming tissue specificity in the pancreatic context. Enrichment for Myc Targets V1 and TNF-α signaling via NF-κB reflects proliferative and inflammatory activity characteristic of pancreatic islets. Protein Secretion and Oxidative Phosphorylation highlight secretory capacity and mitochondrial metabolism essential for insulin production and glucose regulation. Moreover, diabetic islet gene sets such as GSE41203 Non-Obese Diabetic Islets DN and GSE94846 PAX8-Overexpression Islet Up reveal disease-related and developmental perturbations linked to diabetes pathophysiology. Together, these results demonstrate that CLAMP effectively distinguishes both physiological and pathological transcriptional programs in pancreatic islets.
 

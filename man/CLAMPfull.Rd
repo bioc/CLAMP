@@ -2,7 +2,7 @@
 % Please edit documentation in R/solvers.R
 \name{CLAMPfull}
 \alias{CLAMPfull}
-\title{Runs the streamlined full CLAMP (Compressed Latent-variable Approach for Massive data Processing) model.}
+\title{Runs the streamlined full CLAMP model.}
 \usage{
 CLAMPfull(
   Y,
@@ -10,7 +10,8 @@ CLAMPfull(
   Chat = NULL,
   svdres = NULL,
   clamp.base.result = NULL,
-  k = NULL,
+  clamp_k = NULL,
+  svd_k = NULL,
   L1 = NULL,
   L2 = NULL,
   cvn = 5,
@@ -50,7 +51,11 @@ CLAMPfull(
 
 \item{clamp.base.result}{Optional result from \code{CLAMPbase()} providing initial values.}
 
-\item{k}{Number of latent variables. Estimated from data if \code{NULL}.}
+\item{clamp_k}{Number of latent variables for CLAMP (final model rank).
+If \code{NULL}, it is chosen from the SVD via \code{getScaleFromSVs}.}
+
+\item{svd_k}{Number of singular values/components to compute in the SVD.
+If \code{NULL}, defaults to \code{max(2, min(n_genes, n_samples) - 1)}.}
 
 \item{L1, L2}{Regularization parameters for \code{Z} and \code{B}. Defaults use values from
 \code{clamp.base.result}.}
@@ -140,7 +145,7 @@ enabled, masks 20\% of gene–pathway associations per column to estimate pathwa
 \examples{
 set.seed(1)
 mat <- matrix(rnorm(100), nrow = 10, ncol = 10)
-base <- CLAMPbase(mat, k = 5, trace = FALSE, max.iter = 5)
+base <- CLAMPbase(mat, clamp_k = 5, trace = FALSE, max.iter = 5)
 prior <- matrix(sample(0:1, 10 * 6, TRUE, prob = c(0.9, 0.1)),
                 nrow = 10, ncol = 6)
 fit <- CLAMPfull(

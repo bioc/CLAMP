@@ -593,7 +593,10 @@ crossVal <- function(clampRes, priorMat, priorMatcv) {
 #' adaptive sparsity, positive constraints, and regularization.
 #'
 #' @param Y Input gene expression matrix (genes x samples). Can be dense, sparse (\code{dgCMatrix}), or FBM.
-#' @param k Number of latent variables.
+#' @param clamp_k Number of latent variables for CLAMP (final model rank).
+#'   If \code{NULL}, it is chosen from the SVD via \code{getScaleFromSVs}.
+#' @param svd_k Number of singular values/components to compute in the SVD.
+#'   If \code{NULL}, defaults to \code{max(2, min(n_genes, n_samples) - 1)}.
 #' @param svdres Optional precomputed SVD result. If not supplied, it is computed internally.
 #' @param L1 L1 regularization strength for Z. Defaults to scaled singular value.
 #' @param L2 L2 regularization strength for B. Defaults to scaled singular value.
@@ -632,14 +635,14 @@ crossVal <- function(clampRes, priorMat, priorMatcv) {
 #' # small toy dataset: 5 genes x 4 samples
 #' Y <- matrix(rnorm(5 * 4), nrow = 5, ncol = 4)
 #' # run a single iteration for speed
-#' res <- CLAMPbase(Y, k = 2, max.iter = 1, trace = FALSE)
+#' res <- CLAMPbase(Y, clamp_k = 2, max.iter = 1, trace = FALSE)
 #' # inspect dimensions of B and Z
 #' dim(res$B)
 #' dim(res$Z)
 #'
 #' @export
 CLAMPbase <- function(
-    Y, k=NULL, svdres = NULL, L1 = NULL, L2 = NULL,
+    Y, clamp_k = NULL, svd_k = NULL, svdres = NULL, L1 = NULL, L2 = NULL,
     Zpos = TRUE, max.iter = 200, tol = 5e-4, trace = FALSE,
     rseed = NULL, B = NULL, scale = 1, pos.adj = 3, adaptive.p = 0.05, adaptive.iter = 20,
     cutoff = 0, ncores = 1) {
@@ -663,54 +666,49 @@ CLAMPbase <- function(
   BdiffCount <- 0
   message("****")
 
-  if (is.null(k)) {
+  if (is.null(svd_k)) {
     n_genes   <- nrow(Y)
     n_samples <- ncol(Y)
-    k <- max(2, min(n_genes, n_samples) - 1)
+    svd_k <- max(2, min(n_genes, n_samples) - 1)
   }
   
   if (is.null(svdres) && is.null(B)) {
     message("Computing SVD")
     if (is_fbm) {
       # For FBM, we need special handling for SVD
-
       if (requireNamespace("bigstatsr", quietly = TRUE)) {
         # Use big_SVD from bigstatsr if available
-        svdres <- bigstatsr::big_SVD(X = Y, k = k)
+        svdres <- bigstatsr::big_SVD(X = Y, k = svd_k)
       } else {
         # Fallback: convert to regular matrix for SVD
         # This might be memory-intensive for large matrices
-        svdres <- rsvd(Y, k = k)
+        svdres <- rsvd(Y, k = svd_k)
       }
     } else if (is_sparse) {
       # For sparse matrices, use irlba or other sparse SVD methods
       if (requireNamespace("irlba", quietly = TRUE)) {
-        svdres <- irlba::irlba(Y, nv = k)
+        svdres <- irlba::irlba(Y, nv = svd_k)
       } else {
-        svdres <- rsvd(Y, k = k)
+        svdres <- rsvd(Y, k = svd_k)
       }
     } else {
       # Regular matrix
-
-      svdres <- rsvd(Y, k = k)
+      svdres <- rsvd(Y, k = svd_k)
     }
-
-
   }
+
   svdres <- rotateSVD(svdres)
-  if(k>20 | is.null(k)){
+
+  if(is.null(clamp_k)){
     scale.res <- getScaleFromSVs(svdres$d, ncol(Y))
-
-    k <- min(floor(scale.res$k*1.5), ncol(Y)-5)
-
-
+    clamp_k <- min(floor(scale.res$k*1.5), svd_k)
     d <- scale.res$scale
+  } else {
+    d <- svdres$d[clamp_k]
   }
-  else{
-    d <- svdres$d[k]
 
-  }
-  message("k is set to ", k)
+  message("CLAMP k is set to ", clamp_k)
+
   if (is.null(L1)) {
     # L1 <- svdres$d[k] * scale
     L1 <- d * scale
@@ -718,11 +716,13 @@ CLAMPbase <- function(
       L1 <- L1 / pos.adj
     }
   }
+
   if (is.null(L2)) {
     #   L2 <- svdres$d[k] * scale
     L2 <- d * scale
   }
-  L2k <- L2 * diag(k)
+
+  L2k <- L2 * diag(clamp_k)
   #    L1 <- svdres$d[k]/2*scale
   message("L1 is set to ", L1)
   message("L2 is set to ", L2)
@@ -730,8 +730,7 @@ CLAMPbase <- function(
   if (is.null(B)) {
     # initialize B with svd
 
-    B <- t(svdres$v[, seq_len(k)] %*% diag(sqrt(svdres$d[seq_len(k)])))
-
+    B <- t(svdres$v[, seq_len(clamp_k)] %*% diag(sqrt(svdres$d[seq_len(clamp_k)])))
 
     # alternative initializations
     # seem to be not as good
@@ -756,7 +755,7 @@ CLAMPbase <- function(
 
   for (i in seq_len(max.iter)) {
     # main loop
-    Zraw <- Z <- mat_mult(Y, t(B), ncores = ncores) %*% solve(tcrossprod(B) + L1 * diag(k))
+    Zraw <- Z <- mat_mult(Y, t(B), ncores = ncores) %*% solve(tcrossprod(B) + L1 * diag(clamp_k))
 
     if (i >= adaptive.iter && adaptive.p > 0) {
       cutoffs <- apply(Zraw, 2, getT)
@@ -807,14 +806,17 @@ CLAMPbase <- function(
       break
     }
   }
-  rownames(B) <- colnames(Z) <- paste0("LV", seq_len(k))
-  return(list(B = B, Z = Z, Zraw = Zraw, L1 = L1, L2 = L2))
+
+  rownames(B) <- colnames(Z) <- paste0("LV", seq_len(clamp_k))
 
   if (ncores > 1) {
     # restore previous state
     options(bigstatsr.check.parallel.blas = TRUE)
     options(default.nproc.blas = blas_nproc)
   }
+
+  return(list(B = B, Z = Z, Zraw = Zraw, L1 = L1, L2 = L2))
+
 }
 
 #' Full CLAMP model with prior information and cross-validation
@@ -827,7 +829,10 @@ CLAMPbase <- function(
 #' @param priorMat Binary matrix (genes x pathways) representing prior annotations.
 #' @param svdres Optional SVD result used for initialization.
 #' @param clamp.base.result Optional result from \code{CLAMPbase()} to initialize B.
-#' @param k Number of latent variables. If \code{NULL}, estimated from SVD.
+#' @param clamp_k Number of latent variables for CLAMP (final model rank).
+#'   If \code{NULL}, it is chosen from the SVD via \code{getScaleFromSVs}.
+#' @param svd_k Number of singular values/components to compute in the SVD.
+#'   If \code{NULL}, defaults to \code{max(2, min(n_genes, n_samples) - 1)}.
 #' @param L1 Regularization strength for Z. If \code{NULL}, initialized from SVD or \code{clamp.base.result}.
 #' @param L2 Regularization strength for B. If \code{NULL}, initialized from SVD or \code{clamp.base.result}.
 #' @param top If set, keeps only top-n values per column in Z during U updates.
@@ -881,27 +886,29 @@ CLAMPbase <- function(
 #' @examples
 #' mat <- matrix(rnorm(100), 10, 10)
 #' svdres <- rsvd::rsvd(mat, k = 5)
-#' base <- CLAMPbase(Y = mat, k = 5, svdres = svdres, trace = FALSE)
+#' base <- CLAMPbase(Y = mat, clamp_k = 5, svdres = svdres, trace = FALSE)
 #' priorMat <- matrix(1, nrow(mat), 5)
 #' full <- CLAMPfullnVP(
 #'     Y = mat, priorMat = priorMat, svdres = svdres,
-#'     clamp.base.result = base, k = 5,
+#'     clamp.base.result = base, clamp_k = 5,
 #'     doCrossval = FALSE, trace = FALSE, max.U.updates = 0
 #' )
 #' @export
 CLAMPfullnVP <- function(
-    Y, priorMat, svdres = NULL, clamp.base.result = NULL, k = NULL, L1 = NULL, L2 = NULL, top = NULL,
-    cvn = 5, max.iter = 350, trace = FALSE, Chat = NULL, maxPath = 10, doCrossval = TRUE,
+    Y, priorMat, svdres = NULL, clamp.base.result = NULL, clamp_k = NULL, 
+    svd_k = NULL, L1 = NULL, L2 = NULL, top = NULL, cvn = 5, max.iter = 350, trace = FALSE, Chat = NULL, maxPath = 10, doCrossval = TRUE,
     penalty.factor = rep(1, ncol(priorMat)), glm_alpha = 0.9,
     minGenes = 10, tol = 5e-4, seed = 123456, allGenes = FALSE, rseed = NULL,
     max.U.updates = 5, pathwaySelection = c("fast"), multiplier = 1,
     adaptive.p = 0.05, useNNLS = TRUE, useRaw = TRUE, refitAll = FALSE, useSE = FALSE, ncores = 1) {
+  
   if (ncores > 1) {
     # if we are parallelizing, then disable BLAS parallelization
     options(bigstatsr.check.parallel.blas = FALSE)
     blas_nproc <- getOption("default.nproc.blas")
     options(default.nproc.blas = NULL)
   }
+
   getT <- function(x) {
     -quantile(x[x < 0], adaptive.p)
   }
@@ -972,40 +979,65 @@ CLAMPfullnVP <- function(
     message("SVD V has the wrong number of columns")
     svdres <- NULL
   }
-  if (is.null(svdres) && is.null(clamp.base.result)) {
-    message("Computing SVD")
-    if (ns > 500) {
-      message("Using rsvd")
 
-      svdres <- rsvd(Y, k = min(ns, max(200, ns / 4)), q = 3)
-    } else {
-      svdres <- svd(Y)
-    }
-    message("Done")
+  if (is.null(svd_k) && is.null(clamp.base.result)) {
+    n_genes   <- nrow(Y)
+    n_samples <- ncol(Y)
+    svd_k <- max(2, min(n_genes, n_samples) - 1)
   }
-  if (is.null(clamp.base.result)) {
-    if (is.null(k)) {
-      k <- floor(sqrt(ncol(Y)))
-      k <- min(k, floor(ncol(Y) * 0.9))
-      message("k is set to ", k)
-    }
 
-    message("Running CLAMPbase")
-    if (is.null(clamp.base.result)) {
-      clamp.base.result <- CLAMPbase(Y, k = k)
+ if (is.null(svdres) && is.null(clamp.base.result)) {
+    message("Computing SVD")
+    if (is_fbm) {
+      # For FBM, we need special handling for SVD
+      if (requireNamespace("bigstatsr", quietly = TRUE)) {
+        # Use big_SVD from bigstatsr if available
+        svdres <- bigstatsr::big_SVD(X = Y, k = svd_k)
+      } else {
+        # Fallback: convert to regular matrix for SVD
+        # This might be memory-intensive for large matrices
+        svdres <- rsvd(Y, k = svd_k)
+      }
+    } else if (is_sparse) {
+      # For sparse matrices, use irlba or other sparse SVD methods
+      if (requireNamespace("irlba", quietly = TRUE)) {
+        svdres <- irlba::irlba(Y, nv = svd_k)
+      } else {
+        svdres <- rsvd(Y, k = svd_k)
+      }
+    } else {
+      # Regular matrix
+      svdres <- rsvd(Y, k = svd_k)
     }
+  }
+
+  if (is.null(svdres) && is.null(clamp.base.result)) {
+    svdres <- rotateSVD(svdres)
+  }
+  
+  if(is.null(clamp.base.result)){
+    scale.res <- getScaleFromSVs(svdres$d, ncol(Y))
+    clamp_k <- min(floor(scale.res$k*1.5), svd_k)
+    d <- scale.res$scale
+  } else {
+    d <- svdres$d[clamp_k]
+  }
+
+  if (is.null(clamp.base.result)) {
+      message("Running CLAMPbase")
+      clamp.base.result <- CLAMPbase(Y, clamp_k = clamp_k, svdres = svdres)
   } else {
     message("using provided CLAMPbase result")
-
     if (nrow(Y) != nrow(clamp.base.result$Z)) {
       if (is.null(rownames(Y)) | is.null(rownames(clamp.base.result$Z))) {
         stop("Y and clamp.base.result$Z must have equal row numbers or row names")
       }
       clamp.base.result$Z <- clamp.base.result$Z[rownames(Y), ]
     }
-    u.iter <- 2
-    k <- ncol(clamp.base.result$Z)
+    clamp_k <- ncol(clamp.base.result$Z)
   }
+
+  message("CLAMP k is set to ", clamp_k)
 
   Z <- clamp.base.result$Z
 
@@ -1032,21 +1064,19 @@ CLAMPfullnVP <- function(
     Z <- apply(Z, 2, sample)
   }
 
-  U <- matrix(0, nrow = ncol(C), ncol = k)
-
+  U <- matrix(0, nrow = ncol(C), ncol = clamp_k)
 
   round2 <- function(x) {
     signif(x, 4)
   }
 
-  u.iter
-
+  u.iter <- 2
   curfrac <- 0
   nposlast <- Inf
   npos <- -Inf
   num.U.updates <- 0
-  L1k <- L1 * diag(k)
-  L2k <- L2 * diag(k)
+  L1k <- L1 * diag(clamp_k)
+  L2k <- L2 * diag(clamp_k)
 
   if (is_fbm) {
     ZYt <- big_cprodMat(Y, as.matrix(Z), ncores = ncores)
@@ -1055,6 +1085,7 @@ CLAMPfullnVP <- function(
   } else {
     B <- solve(Matrix::t(Z) %*% Z + L2k) %*% mat_mult(Matrix::t(Z), Y, ncores = ncores)
   }
+
   Zraw <- Z
   Z2 <- matrix(0, nrow = nrow(Z), ncol = ncol(Z))
 
@@ -1097,7 +1128,7 @@ CLAMPfullnVP <- function(
         Z2 <- L1 * C %*% U
       }
 
-      curfrac <- (npos <- sum(apply(U, 2, max) > 0)) / k
+      curfrac <- (npos <- sum(apply(U, 2, max) > 0)) / clamp_k
       # Z1=Y%*%t(B)
       Z1 <- mat_mult(Y, t(B), ncores = ncores)
 
@@ -1162,8 +1193,9 @@ CLAMPfullnVP <- function(
       break
     }
   }
+
   rownames(U) <- colnames(priorMat)
-  colnames(U) <- rownames(B) <- paste0("LV", seq_len(k))
+  colnames(U) <- rownames(B) <- paste0("LV", seq_len(clamp_k))
 
   out <- list(B = B, Z = Z, U = U, C = C, L1 = L1, L2 = L2, heldOutGenes = heldOutGenes)
 
@@ -1269,13 +1301,14 @@ projectCLAMP <- function(CLAMPres, newdata, scale = 1, ncores = 1) {
   # Solve the regularized system
   B <- solve(ZtZ + L2k) %*% ZY
 
-  return(B)
-
   if (ncores > 1) {
     # restore previous state
     options(bigstatsr.check.parallel.blas = TRUE)
     options(default.nproc.blas = blas_nproc)
   }
+
+  return(B)
+
 }
 
 ## Refactored PC estimation functions
@@ -1488,7 +1521,10 @@ ridge_B <- function(Y, Z, L2k) {
 #' @param Chat Ignored in this version (kept for interface compatibility).
 #' @param svdres Optional precomputed SVD result for initialization.
 #' @param clamp.base.result Optional result from \code{CLAMPbase()} providing initial values.
-#' @param k Number of latent variables. Estimated from data if \code{NULL}.
+#' @param clamp_k Number of latent variables for CLAMP (final model rank).
+#'   If \code{NULL}, it is chosen from the SVD via \code{getScaleFromSVs}.
+#' @param svd_k Number of singular values/components to compute in the SVD.
+#'   If \code{NULL}, defaults to \code{max(2, min(n_genes, n_samples) - 1)}.
 #' @param L1,L2 Regularization parameters for \code{Z} and \code{B}. Defaults use values from
 #'   \code{clamp.base.result}.
 #' @param cvn Number of folds for pathway-level cross-validation. Default: 5.
@@ -1539,7 +1575,7 @@ ridge_B <- function(Y, Z, L2k) {
 #' @examples
 #' set.seed(1)
 #' mat <- matrix(rnorm(100), nrow = 10, ncol = 10)
-#' base <- CLAMPbase(mat, k = 5, trace = FALSE, max.iter = 5)
+#' base <- CLAMPbase(mat, clamp_k = 5, trace = FALSE, max.iter = 5)
 #' prior <- matrix(sample(0:1, 10 * 6, TRUE, prob = c(0.9, 0.1)),
 #'                 nrow = 10, ncol = 6)
 #' fit <- CLAMPfull(
@@ -1554,16 +1590,20 @@ ridge_B <- function(Y, Z, L2k) {
 #' )
 #' @export
 CLAMPfull <- function(
-    Y, priorMat, Chat=NULL,svdres = NULL, clamp.base.result = NULL, k = NULL, L1 = NULL, L2 = NULL,
-    cvn = 5, max.iter = 30, trace = TRUE,  maxPath = 10, doCrossval = TRUE,
+    Y, priorMat, Chat=NULL, svdres = NULL, clamp.base.result = NULL, clamp_k = NULL, 
+    svd_k = NULL, L1 = NULL, L2 = NULL, cvn = 5, max.iter = 30, trace = TRUE,  maxPath = 10, doCrossval = TRUE,
     penalty.factor = rep(1, ncol(priorMat)), glm_alpha = 0.9,
     minGenes = 0, tol = 5e-4, seed = 123456, allGenes = FALSE, rseed = NULL,
     max.U.updates = Inf, pathwaySelection = c("fast", "complete"),  multiplier = 5,
     adaptive.p = 0.05, useNNLS = TRUE, useRaw = TRUE, refitEvery = 3,
     useSE = FALSE, var.prior = TRUE, Uscale = FALSE, robust.vp = TRUE, use_cpp=FALSE) {
+  
   if (is.infinite(max.U.updates)) max.U.updates <- max.iter
+
   getT <- function(x) -stats::quantile(x[x < 0], adaptive.p)
+
   pathwaySelection <- match.arg(pathwaySelection, c("fast", "complete"))
+
   priorMat <- as.matrix(priorMat)
 
   message("** CLAMPfull **")
@@ -1645,38 +1685,70 @@ CLAMPfull <- function(
   ns <- ncol(Y)
 
   if (!is.null(svdres) && nrow(svdres$v) != ncol(Y)) {
-    message("SVD V has the wrong number of columns; ignoring provided svdres")
+    message("SVD V has the wrong number of columns")
     svdres <- NULL
   }
-  if (is.null(svdres) && is.null(clamp.base.result)) {
+
+  if (is.null(svd_k) && is.null(clamp.base.result)) {
+    n_genes   <- nrow(Y)
+    n_samples <- ncol(Y)
+    svd_k <- max(2, min(n_genes, n_samples) - 1)
+  }
+
+ if (is.null(svdres) && is.null(clamp.base.result)) {
     message("Computing SVD")
-    if (ns > 500) {
-      svdres <- rsvd::rsvd(Y, k = min(ns, max(200, ns / 4)), q = 3)
-    } else {
-      svdres <- svd(Y)
-    }
-    message("Done")
-  }
-  if (is.null(clamp.base.result)) {
-    if (is.null(k)) {
-      k <- floor(sqrt(ncol(Y)))
-      k <- min(k, floor(ncol(Y) * 0.9))
-      message("k is set to ", k)
-    }
-    message("Running CLAMPbase")
-    clamp.base.result <- CLAMPbase(Y, k = k)
-    u.iter <- 2
-  } else {
-    message("Using provided CLAMPbase result")
-    if (nrow(Y) != nrow(clamp.base.result$Z)) {
-      if (is.null(rownames(Y)) || is.null(rownames(clamp.base.result$Z))) {
-        stop("Y and clamp.base.result$Z must have equal row numbers or matching rownames")
+    if (is_fbm) {
+      # For FBM, we need special handling for SVD
+      if (requireNamespace("bigstatsr", quietly = TRUE)) {
+        # Use big_SVD from bigstatsr if available
+        svdres <- bigstatsr::big_SVD(X = Y, k = svd_k)
+      } else {
+        # Fallback: convert to regular matrix for SVD
+        # This might be memory-intensive for large matrices
+        svdres <- rsvd(Y, k = svd_k)
       }
-      clamp.base.result$Z <- clamp.base.result$Z[rownames(Y), , drop = FALSE]
+    } else if (is_sparse) {
+      # For sparse matrices, use irlba or other sparse SVD methods
+      if (requireNamespace("irlba", quietly = TRUE)) {
+        svdres <- irlba::irlba(Y, nv = svd_k)
+      } else {
+        svdres <- rsvd(Y, k = svd_k)
+      }
+    } else {
+      # Regular matrix
+      svdres <- rsvd(Y, k = svd_k)
     }
-    u.iter <- 2
-    k <- ncol(clamp.base.result$Z)
   }
+
+  if (is.null(svdres) && is.null(clamp.base.result)) {
+    svdres <- rotateSVD(svdres)
+  }
+  
+  if(is.null(clamp.base.result)){
+    scale.res <- getScaleFromSVs(svdres$d, ncol(Y))
+    clamp_k <- min(floor(scale.res$k*1.5), svd_k)
+    d <- scale.res$scale
+  } else {
+    d <- svdres$d[clamp_k]
+  }
+
+  if (is.null(clamp.base.result)) {
+      message("Running CLAMPbase")
+      clamp.base.result <- CLAMPbase(Y, clamp_k = clamp_k, svdres = svdres)
+  } else {
+    message("using provided CLAMPbase result")
+    if (nrow(Y) != nrow(clamp.base.result$Z)) {
+      if (is.null(rownames(Y)) | is.null(rownames(clamp.base.result$Z))) {
+        stop("Y and clamp.base.result$Z must have equal row numbers or row names")
+      }
+      clamp.base.result$Z <- clamp.base.result$Z[rownames(Y), ]
+    }
+    clamp_k <- ncol(clamp.base.result$Z)
+  }
+
+  message("CLAMP k is set to ", clamp_k)
+
+  u.iter <- 2
 
   Z <- clamp.base.result$Z
   if (is.null(L1)) L1 <- clamp.base.result$L1
@@ -1696,9 +1768,9 @@ CLAMPfull <- function(
     Z <- apply(Z, 2, sample)
   }
 
-  U <- matrix(0, nrow = ncol(C), ncol = k)
-  L1k <- L1 * diag(k)
-  L2k <- L2 * diag(k)
+  U <- matrix(0, nrow = ncol(C), ncol = clamp_k)
+  L1k <- L1 * diag(clamp_k)
+  L2k <- L2 * diag(clamp_k)
 
   ## Optional FBM path (kept in comments for compatibility)
   # if (is_fbm) {
@@ -1737,8 +1809,7 @@ CLAMPfull <- function(
         Uprev <- if (num.U.updates %% refitEvery == 0 || iter==u.iter) NULL else U
         if(!is.null(Uprev)){
           #  print("Reusing previous")
-        }
-        else{
+        } else {
           #  print("Fitting new")
         }
 
@@ -1762,8 +1833,6 @@ CLAMPfull <- function(
         if (robust.vp) Z2 <- winsor_topk(Z2, 20)
         Zmultiplier <- getVarMultiplier(Zinput, Z2)
 
-
-
         B2        <- B %*% t(B)          # k×k
         bk2_all  <- diag(B2)             # length k
         YBt      <- Y %*% t(B)          # n×k
@@ -1780,7 +1849,7 @@ CLAMPfull <- function(
 
         else {
           for (inner.iter in seq_len(3)) {
-            for (k_index in sample.int(k)) {
+            for (k_index in sample.int(clamp_k)) {
 
 
               gene_var <-L1 * (1 / (multiplier * Zmultiplier[, k_index] + 1))
@@ -1851,7 +1920,7 @@ CLAMPfull <- function(
   }
 
   rownames(U) <- colnames(priorMat)
-  colnames(U) <- rownames(B) <- paste0("LV", seq_len(k))
+  colnames(U) <- rownames(B) <- paste0("LV", seq_len(clamp_k))
   rownames(Z) <- rownames(Y)
 
   out <- list(B = B, Z = Z, U = U, C = C, L1 = L1, L2 = L2, Z2=Z2,heldOutGenes = heldOutGenes)
