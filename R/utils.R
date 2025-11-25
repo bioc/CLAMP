@@ -517,12 +517,14 @@ preprocessCLAMPFBM <- function(fbm, mean_cutoff = NULL, var_cutoff = NULL, backi
     n_r <- nrow(fbm)
     n_c <- ncol(fbm)
 
-  # Choose base names
   base_bk <- if (is.null(backingfile)) {
-    paste0(fbm$backingfile, "_preproc")
-  } else {
-    backingfile
-  }
+      # remove the .bk extension if it exists in the original path
+      clean_path <- sub("\\.bk$", "", fbm$backingfile)
+      paste0(clean_path, "_preproc")
+    } else {
+      # remove .bk if they included it
+      sub("\\.bk$", "", backingfile)
+    }
 
   # Make a writable copy
   fbm_copy <- FBM(nrow = n_r, ncol = n_c, backingfile = base_bk, create_bk = TRUE)
