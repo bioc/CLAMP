@@ -387,6 +387,7 @@ computeRowStatsFBM <- function(fbm, ncores = 1) {
 #' @param mean_cutoff Optional minimum mean threshold; rows with means below this are removed.
 #' @param var_cutoff Optional minimum variance threshold; rows with variances below this are removed.
 #' @param backingfile A character string specifying the filename (without extension) for the new FBM.
+#' @param keep_samples_idx Optional integer vector of column indices to retain.
 #' Default is `filtered_fbm`.
 #'
 #' @return A list with:
@@ -406,31 +407,39 @@ computeRowStatsFBM <- function(fbm, ncores = 1) {
 #' }
 #'
 #' @export
-filterFBM <- function(fbm, rowStats, mean_cutoff = NULL, var_cutoff = NULL, backingfile = "filtered_fbm") {
+filterFBM<- function(fbm, rowStats, keep_samples_idx=NULL, mean_cutoff = NULL, var_cutoff = NULL, backingfile = "filtered_fbm") {
   row_means <- rowStats$row_means
   row_variances <- rowStats$row_variances
-
+  
   # Determine rows to keep based on cutoffs
   keep_rows <- rep(TRUE, length(row_means))  # Default: keep all rows
-
+  
   if (!is.null(mean_cutoff)) {
     keep_rows <- keep_rows & (row_means >= mean_cutoff)
   }
-
+  
   if (!is.null(var_cutoff)) {
     keep_rows <- keep_rows & (row_variances >= var_cutoff)
   }
 
+  if (is.null(keep_samples_idx)) {
+    keep_samples_idx <- cols_along(fbm)
+  }
+  
   # Number of rows to keep
   n_kept <- sum(keep_rows)
-
+  
   if (n_kept == 0) {
     stop("No rows meet the filtering criteria.")
   }
-
+  
   # Create a new FBM with the filtered data
-  fbm_filtered <- FBM(n_kept, ncol(fbm), backingfile = backingfile)
-  fbm_filtered[] <- fbm[keep_rows, ]
+  fbm_filtered <- big_copy(
+    X           = fbm,
+    ind.row     = which(keep_rows),
+    ind.col     = keep_samples_idx,
+    backingfile = backingfile
+  )
 
   return(list(fbm_filtered = fbm_filtered, kept_rows = which(keep_rows)))
 }
