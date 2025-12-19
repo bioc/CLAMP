@@ -39,3 +39,12 @@ with only the selected rows.
 This function creates a new FBM and copies over only the rows that pass the filtering criteria.
 The original FBM is unchanged.
 }
+\examples{
+\dontrun{
+library(bigstatsr)
+fbm <- FBM(5, 3, init = matrix(rnorm(15), nrow = 5))
+rs <- list(row_means = rowMeans(fbm[]), row_variances = apply(fbm[], 1, var))
+out <- filterFBM(fbm, rs, mean_cutoff = -0.2, var_cutoff = 0.5, backingfile = tempfile())
+}
+
+}
