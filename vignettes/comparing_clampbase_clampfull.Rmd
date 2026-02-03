@@ -1,0 +1,181 @@
+---
+title: "Comparing CLAMPbase and CLAMPfull"
+author: "Maria Chikina"
+package: CLAMP
+output:
+  BiocStyle::html_document:
+    fig_width: 7
+    fig_height: 5
+vignette: >
+  %\VignetteIndexEntry{Comparing CLAMPbase and CLAMPfull}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  cache = FALSE,
+  dev = "png",
+  dev.args = list(type = "cairo")
+)
+library(CLAMP)
+```
+
+# Overview
+
+This vignette compares the two main models in the **CLAMP** package:
+
+1. **CLAMPbase**: Unsupervised matrix factorization for dimensionality reduction without prior knowledge.
+2. **CLAMPfull**: Pathway-guided refinement that integrates biological prior knowledge to improve interpretability.
+
+Using a small human whole blood RNA-Seq dataset, we demonstrate that incorporating pathway priors in `CLAMPfull` improves the biological interpretability of latent variables compared to the baseline `CLAMPbase` model.
+
+We illustrate how to:
+
+- Fit both `CLAMPbase` and `CLAMPfull` models,
+- Compare their performance using cell type correlations, and
+- Verify that the FBM (Filebacked Big Matrix) implementation produces identical results.
+
+
+## 1. Load Data and Normalize
+
+```{r load-data}
+data("dataWholeBlood")
+data("majorCellTypes")
+data('celltypeTargets')
+
+# Scale each gene to mean 0 and variance 1
+dataWholeBlood <- tscale(dataWholeBlood)
+```
+
+## 2. Load Prior Knowledge Matrices
+
+```{r load-priors}
+# Download pathway and cell marker libraries from Enrichr
+gmtList <- list(
+  CellMarkers = getGMT(
+    "https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=CellMarker_2024",
+    "CellMarker_2024"
+  ),
+  KEGG = getGMT(
+    "https://maayanlab.cloud/Enrichr/geneSetLibrary?mode=text&libraryName=KEGG_2021_Human",
+    "KEGG_2021_Human"
+  )
+)
+
+# Combine into a single sparse matrix
+pathMatCell <- gmtListToSparseMat(gmtList)
+
+# Load additional xCell reference matrix
+data("xCell")
+
+# Match pathways to the gene space of whole blood
+matchedPathsWB <- getMatchedPathwayMatList(
+  pathMatCell, 
+  xCell,
+  new.genes = rownames(dataWholeBlood),
+  min.genes = 2
+)
+```
+
+## 3. Compute SVD and infer k
+
+```{r compute-svd}
+# Compute SVD (k = n_samples - 1)
+set.seed(1)
+wb_svd_k <- ncol(dataWholeBlood) - 1
+dataWholeBlood.svd <- rsvd::rsvd(dataWholeBlood, k = wb_svd_k)
+
+# Infer clamp_k from singular values
+wb_clamp_k <- num.pc(list(d = dataWholeBlood.svd$d)) * 2
+wb_clamp_k
+```
+
+## 4. Fit CLAMPbase and CLAMPfull
+
+```{r fit-clampbase}
+# Fit baseline CLAMP
+wb.clamp.base <- CLAMPbase(
+  dataWholeBlood,
+  svdres = dataWholeBlood.svd,
+  clamp_k = wb_clamp_k,
+  trace = FALSE,
+  adaptive.p = 0.05
+)
+```
+
+```{r fit-clampfull}
+# Fit variance-prior extended CLAMP model
+wb.clamp.full <- CLAMPfull(
+  dataWholeBlood,
+  priorMat = matchedPathsWB,
+  svdres = dataWholeBlood.svd,
+  clamp.base.result = wb.clamp.base,
+  clamp_k = wb_clamp_k,
+  trace = TRUE,
+  use_cpp = TRUE
+)
+```
+
+## 5. Compare CLAMPbase vs CLAMPfull
+
+This plot compares the maximum Spearman correlation for each major blood cell type between `CLAMPbase` and `CLAMPfull`.
+
+Points above the red dashed line indicate improved correspondence when biological priors are included.
+
+Most cell types show higher correlations under `CLAMPfull`, demonstrating that integrating pathway information helps capture more biologically meaningful latent variables.
+
+```{r compare-models, fig.width=6, fig.height=5}
+output <- compareBs(
+  wb.clamp.base,
+  wb.clamp.full,
+  celltypeTargets,
+  "CLAMPbase",
+  "CLAMPfull",
+  m = "s"
+)
+
+output$plot
+```
+## 7. Verify FBM Implementation
+
+We verify that `CLAMPfull` produces identical results when using a file-backed matrix (FBM) input instead of an in-memory matrix.
+
+```{r fit-clampfull-fbm}
+dataWholeBloodFBM <- bigstatsr::as_FBM(dataWholeBlood)
+
+wb.clamp.full.fbm <- CLAMPfull(
+  dataWholeBloodFBM,
+  priorMat = matchedPathsWB,
+  svdres = dataWholeBlood.svd,
+  clamp.base.result = wb.clamp.base,
+  clamp_k = wb_clamp_k,
+  trace = TRUE,
+  use_cpp = TRUE
+)
+```
+
+The FBM implementation produces identical results:
+
+```{r compare-fbm, fig.width=6, fig.height=5}
+output <- compareBs(
+  wb.clamp.full,
+  wb.clamp.full.fbm,
+  celltypeTargets,
+  "CLAMPbase",
+  "CLAMPfull",
+  m = "s"
+)
+
+output$plot
+```
+
+# Session Information
+
+```{r session-info}
+sessionInfo()
+```

@@ -1,5 +1,5 @@
-Type: Package
 Package: CLAMP
+Type: Package
 Title: Curated Latent-variable Analysis with Molecular Priors
 Version: 0.99.0
 Authors@R: 
@@ -23,7 +23,7 @@ License: GPL-3
 URL: https://mchikina.github.io/CLAMP/, https://github.com/mchikina/CLAMP
 BugReports: https://github.com/mchikina/CLAMP/issues
 Depends:
-    R (>= 4.4.0)
+    R (>= 4.6.0),
 Imports:
     bigstatsr,
     circlize,
@@ -36,12 +36,12 @@ Imports:
     irlba,
     Matrix,
     matrixStats,
+    methods,
+    Rcpp,
     rlang,
     rsvd,
-    utils,
-    Rcpp,
     stats,
-    methods
+    utils
 Suggests:
     AnnotationDbi,
     BiocStyle,
@@ -54,13 +54,15 @@ Suggests:
     org.Hs.eg.db,
     rappdirs,
     rmarkdown,
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    CLAMPData
 LinkingTo: Rcpp, RcppArmadillo
-VignetteBuilder:  knitr
+VignetteBuilder: knitr
 biocViews: Software, GeneExpression, RNASeq, Transcriptomics,
     DimensionReduction, Visualization, Normalization, Pathways,
     Preprocessing, GenePrediction, GeneTarget
 Encoding: UTF-8
+LazyData: false
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Config/testthat/edition: 3

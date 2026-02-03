@@ -177,9 +177,8 @@ getGMT <- function(url, name = NULL, cache_dir = NULL, redownload = FALSE) {
         message("Auto-detected name: ", name)
     }
     if (is.null(cache_dir)) {
-        cache_dir <- system.file("extdata", package = "CLAMP")
-        if (!nzchar(cache_dir)) cache_dir <- tools::R_user_dir("CLAMP", "cache")
-    }
+    cache_dir <- tools::R_user_dir("CLAMP", "cache")
+    } 
     cache_file <- file.path(cache_dir, paste0(name, ".gmt"))
     if (!file.exists(cache_file) || redownload) {
         message("Downloading ", name, " from Enrichr...")
@@ -301,7 +300,7 @@ commonRows <- function(data1, data2) {
 #' Modifies the FBM in place. Uses `bigstatsr::big_apply()` to process in parallel-safe chunks.
 #' @importFrom bigstatsr big_apply rows_along FBM
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' library(bigstatsr)
 #' fbm <- FBM(3, 4, init = matrix(c(0, 1, 2, NA, 100, 200, 300, 400, 5, 6, 7, 8), nrow = 3))
 #' cleanFBM(fbm, ncores = 1)
@@ -399,13 +398,13 @@ computeRowStatsFBM <- function(fbm, ncores = 1) {
 #' This function creates a new FBM and copies over only the rows that pass the filtering criteria.
 #' The original FBM is unchanged.
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' library(bigstatsr)
 #' fbm <- FBM(5, 3, init = matrix(rnorm(15), nrow = 5))
 #' rs <- list(row_means = rowMeans(fbm[]), row_variances = apply(fbm[], 1, var))
 #' out <- filterFBM(fbm, rs, mean_cutoff = -0.2, var_cutoff = 0.5, backingfile = tempfile())
 #' }
-#'
+#' @importFrom bigstatsr cols_along big_copy
 #' @export
 filterFBM<- function(fbm, rowStats, keep_samples_idx=NULL, mean_cutoff = NULL, var_cutoff = NULL, backingfile = "filtered_fbm") {
   row_means <- rowStats$row_means

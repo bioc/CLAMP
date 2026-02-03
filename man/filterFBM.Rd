@@ -7,6 +7,7 @@
 filterFBM(
   fbm,
   rowStats,
+  keep_samples_idx = NULL,
   mean_cutoff = NULL,
   var_cutoff = NULL,
   backingfile = "filtered_fbm"
@@ -17,12 +18,14 @@ filterFBM(
 
 \item{rowStats}{A list with numeric vectors \code{row_means} and \code{row_variances}.}
 
+\item{keep_samples_idx}{Optional integer vector of column indices to retain.
+Default is \code{filtered_fbm}.}
+
 \item{mean_cutoff}{Optional minimum mean threshold; rows with means below this are removed.}
 
 \item{var_cutoff}{Optional minimum variance threshold; rows with variances below this are removed.}
 
-\item{backingfile}{A character string specifying the filename (without extension) for the new FBM.
-Default is \code{filtered_fbm}.}
+\item{backingfile}{A character string specifying the filename (without extension) for the new FBM.}
 }
 \value{
 A list with:
@@ -40,11 +43,10 @@ This function creates a new FBM and copies over only the rows that pass the filt
 The original FBM is unchanged.
 }
 \examples{
-\dontrun{
+\donttest{
 library(bigstatsr)
 fbm <- FBM(5, 3, init = matrix(rnorm(15), nrow = 5))
 rs <- list(row_means = rowMeans(fbm[]), row_variances = apply(fbm[], 1, var))
 out <- filterFBM(fbm, rs, mean_cutoff = -0.2, var_cutoff = 0.5, backingfile = tempfile())
 }
-
 }

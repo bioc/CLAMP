@@ -34,7 +34,7 @@ is optimized using \code{bigstatsr::big_cprodMat()}.
 \examples{
 # fit a tiny CLAMP model for projection
 Y0 <- matrix(rnorm(5 * 3), nrow = 5)
-base <- CLAMPbase(Y0, k = 2, max.iter = 1, trace = FALSE)
+base <- CLAMPbase(Y0, clamp_k = 2, max.iter = 1, trace = FALSE)
 # new data with same 5 genes
 newY <- matrix(rnorm(5 * 2), nrow = 5)
 projB <- projectCLAMP(base, newdata = newY)

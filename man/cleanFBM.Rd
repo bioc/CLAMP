@@ -27,7 +27,7 @@ transformation in-place. If any NA values are detected, they are replaced with 0
 Modifies the FBM in place. Uses \code{bigstatsr::big_apply()} to process in parallel-safe chunks.
 }
 \examples{
-\dontrun{
+\donttest{
 library(bigstatsr)
 fbm <- FBM(3, 4, init = matrix(c(0, 1, 2, NA, 100, 200, 300, 400, 5, 6, 7, 8), nrow = 3))
 cleanFBM(fbm, ncores = 1)
