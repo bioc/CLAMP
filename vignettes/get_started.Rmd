@@ -284,6 +284,9 @@ matchedPathsWB <- getMatchedPathwayMatList(
 )
 ```
 
+**Note**: GMT files can also be loaded from local storage using read_gmt().
+This allows you to integrate custom or curated gene set libraries, such as *MSigDB* canonical pathways, directly into your analysis pipeline alongside remote resources.
+
 ## 6. CLAMPfull
 
 Finally, we refine the base model by integrating pathway priors using `CLAMPfull`,
