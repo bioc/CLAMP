@@ -7,13 +7,31 @@
 read_gmt(filename)
 }
 \arguments{
-\item{filename}{A character string giving the path to a .gmt file.}
+\item{filename}{A \code{character(1)} string giving the path to a .gmt file.}
 }
 \value{
-A named list where each element is a character vector of gene names.
+A \code{list} where each element is a character vector of gene names,
+named by the gene set ID.
 }
 \description{
-Parses a local GMT file and returns a list of gene sets, with each gene
-set represented as
-a character vector of unique gene names.
+Parses a local GMT file and returns a list of gene sets. Each gene
+set is represented as a character vector of unique gene names.
+}
+\examples{
+# Bioconductor requires runnable examples. 
+# We create a dummy GMT file for this example:
+gmt_file <- tempfile(fileext = ".gmt")
+writeLines(
+    c("PATHWAY_A\thttp://link.com\tGENE1\tGENE2\tGENE3",
+      "PATHWAY_B\thttp://link.com\tGENE2\tGENE4"),
+    con = gmt_file
+)
+
+# Run the function
+gs <- read_gmt(gmt_file)
+
+# Inspect results
+length(gs)
+names(gs)
+gs[["PATHWAY_A"]]
 }

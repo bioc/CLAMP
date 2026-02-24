@@ -195,25 +195,56 @@ getGMT <- function(url, name = NULL, cache_dir = NULL, redownload = FALSE) {
 
 #' Read a GMT file into a list
 #'
-#' Parses a local GMT file and returns a list of gene sets, with each gene
-#' set represented as
-#' a character vector of unique gene names.
+#' Parses a local GMT file and returns a list of gene sets. Each gene
+#' set is represented as a character vector of unique gene names.
 #'
-#' @param filename A character string giving the path to a .gmt file.
+#' @param filename A \code{character(1)} string giving the path to a .gmt file.
 #'
-#' @return A named list where each element is a character vector of gene names.
+#' @return A \code{list} where each element is a character vector of gene names, 
+#' named by the gene set ID.
+#'
+#' @importFrom utils read.table
+#' @export
+#'
+#' @examples
+#' # Bioconductor requires runnable examples. 
+#' # We create a dummy GMT file for this example:
+#' gmt_file <- tempfile(fileext = ".gmt")
+#' writeLines(
+#'     c("PATHWAY_A\thttp://link.com\tGENE1\tGENE2\tGENE3",
+#'       "PATHWAY_B\thttp://link.com\tGENE2\tGENE4"),
+#'     con = gmt_file
+#' )
+#' 
+#' # Run the function
+#' gs <- read_gmt(gmt_file)
+#' 
+#' # Inspect results
+#' length(gs)
+#' names(gs)
+#' gs[["PATHWAY_A"]]
 read_gmt <- function(filename) {
-  gmt <- list()
-  lines <- readLines(filename)
-  for (line in lines) {
-    line <- gsub("\"", "", trimws(line))
-    sp <- unlist(strsplit(line, "\t"))
-    sp[3:length(sp)] <- gsub(",.*$", "", sp[3:length(sp)])
-    gmt[[sp[1]]] <- sort(unique(sp[3:length(sp)]))
-  }
-  return(gmt)
-}
+    if (!file.exists(filename)) {
+        stop("The file '", filename, "' does not exist.", call. = FALSE)
+    }
 
+    gmt <- list()
+    lines <- readLines(filename)
+    
+    for (line in lines) {
+        # Bioc style: avoid complex nested regex if possible for clarity
+        sp <- unlist(strsplit(trimws(line), "\t"))
+        
+        if (length(sp) < 3) next # Skip malformed lines
+        
+        set_name <- sp[1]
+        # Columns 3 onwards are genes; removing potential comma-based metadata
+        genes <- gsub(",.*$", "", sp[3:length(sp)])
+        gmt[[set_name]] <- sort(unique(genes))
+    }
+    
+    return(gmt)
+}
 
 #' Convert a list of GMT gene sets to a sparse matrix
 #'
