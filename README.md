@@ -29,7 +29,7 @@ REPO_PATH=~/path/to/CLAMP
 
 # Install and check CLAMP using devtools
 Rscript -e "devtools::install_local('$REPO_PATH', force=TRUE, dependencies=FALSE)"
-Rscript -e "library(CLAMP); cat('CLAMP version:', packageVersion('CLAMP'), '\n')"
+Rscript -e "library(CLAMP); cat('CLAMP version:', as.character(packageVersion('CLAMP')), '\n')"
 ```
 
 ## Installation
