@@ -292,7 +292,8 @@ plotTopZ_Complex <- function(clampRes, data, priorMat, top = 10, top.pathway = 5
     show_row_names = TRUE, show_column_names = FALSE,
     cluster_rows = TRUE, cluster_columns = TRUE,
     width = grid::unit(7, "cm"),
-    row_dend_width = grid::unit(0, "mm")
+    row_dend_width = grid::unit(0, "mm"),
+    use_raster = FALSE
   )
 
   col_fun <- circlize::colorRamp2(c(0, 1), c("white", "black"))
@@ -304,7 +305,8 @@ plotTopZ_Complex <- function(clampRes, data, priorMat, top = 10, top.pathway = 5
     column_names_rot = 45,
     row_names_gp = grid::gpar(fontsize = 8),
     column_names_gp = grid::gpar(fontsize = 8),
-    width = grid::unit(6, "cm")
+    width = grid::unit(6, "cm"),
+    use_raster = FALSE
   )
 
   if (Zheat) {
@@ -318,7 +320,8 @@ plotTopZ_Complex <- function(clampRes, data, priorMat, top = 10, top.pathway = 5
       cluster_rows = TRUE, cluster_columns = TRUE,
       show_row_names = TRUE, show_column_names = TRUE,
       column_names_rot = 90,
-      width = grid::unit(1, "cm")
+      width = grid::unit(1, "cm"),
+      use_raster = FALSE
     )
   }
 

@@ -1239,50 +1239,106 @@ CLAMPfullnVP <- function(
 
 #' Project new data into CLAMP latent space
 #'
-#' Computes the latent loadings \code{B} for new gene expression data using the latent variables
-#' \code{Z} from a fitted CLAMP model. This allows transfer of the learned latent structure to
-#' new datasets with matched genes.
+#' Computes the latent loadings \code{B} for new gene expression data using
+#' the latent variables \code{Z} from a fitted CLAMP model. This allows
+#' transfer of the learned latent structure to new datasets with matched genes.
 #'
-#' @param CLAMPres A result object from \code{CLAMPfull()} or \code{CLAMPbase()}, containing at least \code{Z} and \code{L2}.
-#' @param newdata A gene expression matrix (genes x samples) to be projected. Must have the same genes (rows) as \code{CLAMPres$Z}.
-#'        Can be a standard matrix, sparse matrix, or FBM/big.matrix.
+#' @param CLAMPres A result object from \code{CLAMPfull()} or
+#'   \code{CLAMPbase()}, containing at least \code{Z} and \code{L2}.
+#' @param newdata A gene expression matrix (genes x samples) to be projected.
+#'   Can be a standard matrix, sparse matrix, or FBM/big.matrix.
 #' @param scale Optional numeric multiplier for the L2 regularization terms. Default is 1.
 #' @param ncores Number of cores to use for parallel computation (only used if newdata is an FBM).
 #'  Default is 1.
+#' @param align Logical; if \code{TRUE} (default), row names shared by
+#'   \code{CLAMPres$Z} and \code{newdata} are used to align both matrices to
+#'   the same genes in the same order before projection. If row names are not
+#'   available, dimensions must already match.
+#' @param verbose Logical; if \code{TRUE} (default), report how many common
+#'   rows are used for projection.
 #' @return A matrix \code{B} of projected latent loadings (LVs x samples) for the new dataset.
 #'
 #' @details
-#' This function uses ridge-regularized least squares to compute \code{B = solve(ZᵗZ + L2·I) · ZᵗY}, where
-#' \code{Z} is the latent matrix from the trained CLAMP model and \code{Y} is the new dataset.
-#' If \code{newdata} is a Filebacked Big Matrix (FBM), the computation
-#' is optimized using \code{bigstatsr::big_cprodMat()}.
+#' This function uses ridge-regularized least squares to compute
+#' \code{B = solve(Z'Z + L2 * I) * Z'Y}, where \code{Z} is the latent matrix
+#' from the trained CLAMP model and \code{Y} is the new dataset. If
+#' \code{newdata} is a Filebacked Big Matrix (FBM) and does not need row-name
+#' subsetting, the computation is optimized using
+#' \code{bigstatsr::big_cprodMat()}.
 #'
 #' @examples
 #' # fit a tiny CLAMP model for projection
-#' Y0 <- matrix(rnorm(5 * 3), nrow = 5)
+#' Y0 <- matrix(rnorm(5 * 3), nrow = 5,
+#'              dimnames = list(paste0("Gene", 1:5), paste0("S", 1:3)))
 #' base <- CLAMPbase(Y0, clamp_k = 2, max.iter = 1, trace = FALSE)
-#' # new data with same 5 genes
-#' newY <- matrix(rnorm(5 * 2), nrow = 5)
+#' # new data can be provided in a different row order
+#' newY <- matrix(rnorm(5 * 2), nrow = 5,
+#'                dimnames = list(rev(rownames(Y0)), paste0("N", 1:2)))
 #' projB <- projectCLAMP(base, newdata = newY)
 #' # check dimensions: 2 latent vars x 2 samples
 #' dim(projB)
 #'
 #' @export
-projectCLAMP <- function(CLAMPres, newdata, scale = 1, ncores = 1) {
-    stopifnot(nrow(CLAMPres$Z) == nrow(newdata))
+projectCLAMP <- function(CLAMPres, newdata, scale = 1, ncores = 1,
+                         align = TRUE, verbose = TRUE) {
+  if (is.null(CLAMPres$Z)) stop("'CLAMPres' must contain a 'Z' matrix.")
+  if (is.null(CLAMPres$L2)) stop("'CLAMPres' must contain an 'L2' value.")
+
+  Z_matrix <- if (inherits(CLAMPres$Z, "Matrix")) {
+    as.matrix(CLAMPres$Z)
+  } else {
+    CLAMPres$Z
+  }
+
+  z_genes <- rownames(Z_matrix)
+  new_genes <- rownames(newdata)
+
+  if (align && !is.null(z_genes) && !is.null(new_genes)) {
+    if (anyDuplicated(z_genes) > 0 || anyDuplicated(new_genes) > 0) {
+      stop("Projection row-name alignment requires unique gene names.")
+    }
+
+    cm <- commonRows(Z_matrix, newdata)
+    if (length(cm) == 0) {
+      stop("No common row names found between CLAMPres$Z and newdata.")
+    }
+    if (verbose) message(length(cm), " common rows found")
+
+    Z_matrix <- Z_matrix[cm, , drop = FALSE]
+    newdata <- newdata[cm, , drop = FALSE]
+  } else {
+    if (nrow(Z_matrix) != nrow(newdata)) {
+      stop(
+        "CLAMPres$Z and newdata have different numbers of rows and cannot ",
+        "be aligned because row names are missing."
+      )
+    }
+
+    if (!is.null(z_genes) && !is.null(new_genes) && !identical(z_genes, new_genes)) {
+      stop(
+        "CLAMPres$Z and newdata row names are not in the same order. ",
+        "Use align = TRUE to align common genes automatically."
+      )
+    }
+
+    if (verbose && (is.null(z_genes) || is.null(new_genes))) {
+      message("Row names unavailable; assuming CLAMPres$Z and newdata are already aligned.")
+    }
+  }
 
   if (ncores > 1) {
     # if we are parallelizing, then disable BLAS parallelization
     options(bigstatsr.check.parallel.blas = FALSE)
     blas_nproc <- getOption("default.nproc.blas")
     options(default.nproc.blas = NULL)
+    on.exit({
+      options(bigstatsr.check.parallel.blas = TRUE)
+      options(default.nproc.blas = blas_nproc)
+    }, add = TRUE)
   }
 
   # Check if newdata is a FBM/big.matrix object
   is_fbm <- inherits(newdata, c("big.matrix", "FBM"))
-
-    # Convert Matrix package matrices to standard R matrices for compatibility
-    Z_matrix <- if (inherits(CLAMPres$Z, "Matrix")) as.matrix(CLAMPres$Z) else CLAMPres$Z
 
   if (is_fbm) {
     # FBM implementation - use big_cprodMat for efficient computation
@@ -1294,18 +1350,15 @@ projectCLAMP <- function(CLAMPres, newdata, scale = 1, ncores = 1) {
     ZY <- t(Z_matrix) %*% newdata
   }
 
-    # Calculate the regularization matrix using standard matrix operations
-    ZtZ <- t(Z_matrix) %*% Z_matrix
-    L2k <- CLAMPres$L2 * diag(ncol(Z_matrix)) * scale
+  # Calculate the regularization matrix using standard matrix operations
+  ZtZ <- t(Z_matrix) %*% Z_matrix
+  L2k <- CLAMPres$L2 * diag(ncol(Z_matrix)) * scale
 
   # Solve the regularized system
   B <- solve(ZtZ + L2k) %*% ZY
 
-  if (ncores > 1) {
-    # restore previous state
-    options(bigstatsr.check.parallel.blas = TRUE)
-    options(default.nproc.blas = blas_nproc)
-  }
+  rownames(B) <- colnames(Z_matrix)
+  colnames(B) <- colnames(newdata)
 
   return(B)
 
@@ -2035,3 +2088,539 @@ getMatchedPathwayMatList <- function(..., new.genes, min.genes = 10) {
 
 }
 
+# Plotting functions (adapted from PLIER, Mao et al.)
+#' Plot the U matrix (pathway-LV associations) as a heatmap
+#'
+#' Displays the pathway loading matrix `U` after filtering by AUC and FDR
+#' thresholds.  Only the top-`top` pathways per LV are shown.
+#'
+#' @param clampRes A CLAMP result list containing at least `U`, `Uauc`, `Up`,
+#'   and `summary`.
+#' @param auc.cutoff Minimum AUC threshold; entries below this are set to zero.
+#'   Default `0.6`.
+#' @param fdr.cutoff Maximum FDR threshold for pathway significance filtering.
+#'   Default `0.05`.
+#' @param indexCol Integer vector of LV column indices to include. `NULL` uses
+#'   all LVs.
+#' @param indexRow Integer vector of pathway row indices to include. `NULL` uses
+#'   all pathways.
+#' @param top Number of top pathways to retain per LV. Default `3`.
+#' @param sort.row Logical; if `TRUE`, rows are sorted by the dominant LV.
+#'   Default `FALSE`.
+#'
+#' @param cluster.rows Logical; if `TRUE` (default), rows are reordered by
+#'   hierarchical clustering (overridden when `sort.row = TRUE`).
+#'
+#' @return Invisibly returns a [ggplot2::ggplot()] object.
+#' @importFrom ggplot2 ggplot aes geom_tile scale_fill_gradient theme_minimal
+#'   theme element_text element_blank labs unit
+#' @importFrom rlang .data
+#' @export
+#' @examples
+#' set.seed(42)
+#' pathways <- paste0("Path", 1:30)
+#' lvs      <- paste0("LV",   1:5)
+#'
+#' U    <- matrix(abs(rnorm(30 * 5)), nrow = 30,
+#'                dimnames = list(pathways, lvs))
+#' Uauc <- matrix(runif(30 * 5, 0.5, 1.0), nrow = 30,
+#'                dimnames = list(pathways, lvs))
+#' Up   <- matrix(runif(30 * 5, 0, 3), nrow = 30,
+#'                dimnames = list(pathways, lvs))
+#'
+#' # Build a minimal summary table
+#' nr <- 30 * 5
+#' summ <- data.frame(
+#'   pathway = rep(pathways, 5),
+#'   LV      = rep(lvs, each = 30),
+#'   AUC     = as.vector(Uauc),
+#'   p_value = runif(nr, 0, 0.1),
+#'   FDR     = runif(nr, 0, 0.1),
+#'   stringsAsFactors = FALSE
+#' )
+#'
+#' clampRes <- list(U = U, Uauc = Uauc, Up = Up, summary = summ)
+#' CLAMPplotU(clampRes, auc.cutoff = 0.6, fdr.cutoff = 0.1, top = 3)
+CLAMPplotU <- function(clampRes, auc.cutoff = 0.6, fdr.cutoff = 0.05,
+                       indexCol = NULL, indexRow = NULL, top = 3,
+                       sort.row = FALSE, cluster.rows = TRUE) {
+
+  indexCol <- if (is.null(indexCol)) seq_len(ncol(clampRes$U)) else indexCol
+  indexRow <- if (is.null(indexRow)) seq_len(nrow(clampRes$U)) else indexRow
+
+  U <- as.matrix(clampRes$U)
+
+  pval.cutoff <- if (!is.null(clampRes$summary) &&
+                     any(clampRes$summary[, 5] < fdr.cutoff)) {
+    max(clampRes$summary[clampRes$summary[, 5] < fdr.cutoff, 4])
+  } else {
+    Inf
+  }
+
+  U[as.matrix(clampRes$Uauc) < auc.cutoff] <- 0
+  U[as.matrix(clampRes$Up) > pval.cutoff]  <- 0
+
+  U <- U[indexRow, indexCol, drop = FALSE]
+
+  for (i in seq_len(ncol(U))) {
+    ct <- sort(U[, i], decreasing = TRUE)[top]
+    if (!is.na(ct)) U[U[, i] < ct, i] <- 0
+  }
+
+  rownames(U) <- make.unique(strtrim(rownames(U), 30))
+  colnames(U) <- make.unique(strtrim(colnames(U), 30))
+
+  keep_row <- rowSums(abs(U)) > 0
+  keep_col <- colSums(abs(U)) > 0
+  U <- U[keep_row, keep_col, drop = FALSE]
+
+  if (nrow(U) == 0 || ncol(U) == 0) {
+    message("No entries pass the AUC/FDR thresholds.")
+    return(invisible(NULL))
+  }
+
+  if (sort.row) {
+    Utmp <- sweep(sign(U), 2, seq_len(ncol(U)) * 100, "*")
+    Um   <- apply(Utmp, 1, max)
+    U    <- U[order(-Um), , drop = FALSE]
+  } else if (cluster.rows && nrow(U) > 1) {
+    U <- U[hclust(dist(U))$order, , drop = FALSE]
+  }
+
+  df <- data.frame(
+    pathway = factor(rep(rownames(U), ncol(U)), levels = rev(rownames(U))),
+    LV      = factor(rep(colnames(U), each = nrow(U)), levels = colnames(U)),
+    value   = as.vector(U),
+    stringsAsFactors = FALSE
+  )
+
+  p <- ggplot2::ggplot(df, ggplot2::aes(
+    x    = .data$LV,
+    y    = .data$pathway,
+    fill = .data$value
+  )) +
+    ggplot2::geom_tile(colour = "white", linewidth = 0.4) +
+    ggplot2::scale_fill_gradient(
+      name   = "U",
+      low    = "#F7FBFF",
+      high   = "#08519C",
+      limits = c(0, NA)
+    ) +
+    ggplot2::theme_minimal(base_size = 10) +
+    ggplot2::theme(
+      axis.text.x      = ggplot2::element_text(angle = 45, hjust = 1, size = 9),
+      axis.text.y      = ggplot2::element_text(size = 7),
+      panel.grid       = ggplot2::element_blank(),
+      legend.key.width = ggplot2::unit(0.4, "cm")
+    ) +
+    ggplot2::labs(x = "Latent Variable", y = NULL)
+
+  p
+}
+
+#' Plot top genes per LV by Z loading
+#'
+#' For each selected latent variable, ranks genes by their Z loading and plots
+#' the top genes as a loading-versus-rank scatter plot. The highest ranking
+#' genes are labelled with `ggrepel`.
+#'
+#' @param clampRes A CLAMP result list containing at least `Z`, and optionally
+#'   `U` for selecting LVs with pathway support.
+#' @param data Deprecated; retained for backward compatibility and ignored.
+#' @param priorMat Deprecated; retained for backward compatibility and ignored.
+#' @param top Number of top genes to plot per LV. Default `50`.
+#' @param index Integer or character vector of LV columns to include. `NULL`
+#'   keeps LVs with non-zero `U` entries when `U` is present.
+#' @param allLVs Logical; if `TRUE`, all LVs are eligible when `index = NULL`.
+#'   Default `FALSE`.
+#' @param label.top Number of top genes to label per LV. Default `min(10, top)`.
+#' @param max.name.len Maximum characters for displayed gene labels.
+#'
+#' @return A [ggplot2::ggplot()] object for one LV, or a `patchwork` object for
+#'   multiple LVs.
+#' @importFrom ggplot2 ggplot aes geom_point theme labs
+#' @importFrom ggrepel geom_text_repel
+#' @importFrom rlang .data
+#' @export
+#' @examples
+#' set.seed(1)
+#' genes <- paste0("Gene", 1:80)
+#' lvs   <- paste0("LV", 1:4)
+#' paths <- paste0("Path", 1:10)
+#' Z     <- matrix(abs(rnorm(80 * 4)), nrow = 80,
+#'                 dimnames = list(genes, lvs))
+#' U     <- matrix(abs(rnorm(10 * 4)), nrow = 10,
+#'                 dimnames = list(paths, lvs))
+#' clampRes <- list(Z = Z, U = U)
+#' CLAMPplotTopZ(clampRes, top = 20, index = 1:2)
+CLAMPplotTopZ <- function(clampRes, data = NULL, priorMat = NULL, top = 50,
+                          index = NULL, allLVs = FALSE,
+                          label.top = min(10, top), max.name.len = 50) {
+
+  if (is.null(clampRes$Z)) {
+    stop("'clampRes' must contain a 'Z' matrix.")
+  }
+
+  Z <- as.matrix(clampRes$Z)
+  if (is.null(rownames(Z))) rownames(Z) <- paste0("Gene", seq_len(nrow(Z)))
+  if (is.null(colnames(Z))) colnames(Z) <- paste0("LV", seq_len(ncol(Z)))
+
+  if (is.null(index)) {
+    if (!allLVs && !is.null(clampRes$U)) {
+      ii <- which(colSums(as.matrix(clampRes$U), na.rm = TRUE) > 0)
+      if (length(ii) == 0) ii <- seq_len(ncol(Z))
+    } else {
+      ii <- seq_len(ncol(Z))
+    }
+  } else if (is.character(index)) {
+    ii <- match(index, colnames(Z))
+    if (anyNA(ii)) {
+      stop("Unknown latent variable(s): ",
+           paste(index[is.na(ii)], collapse = ", "))
+    }
+  } else {
+    ii <- as.integer(index)
+  }
+
+  ii <- unique(ii[!is.na(ii) & ii >= 1 & ii <= ncol(Z)])
+  if (length(ii) == 0) stop("No latent variables selected.")
+
+  top <- as.integer(top)[1]
+  if (!is.finite(top) || top < 1) stop("'top' must be a positive integer.")
+
+  label.top <- as.integer(label.top)[1]
+  if (!is.finite(label.top) || label.top < 0) {
+    stop("'label.top' must be a non-negative integer.")
+  }
+  label.top <- min(label.top, top)
+
+  make_lv_df <- function(i) {
+    loadings <- Z[, i]
+    keep <- which(!is.na(loadings))
+    if (length(keep) == 0) {
+      return(data.frame())
+    }
+
+    loadings <- loadings[keep]
+    genes <- rownames(Z)[keep]
+    ord <- order(loadings, decreasing = TRUE)
+    n_top <- min(top, length(ord))
+    ord <- ord[seq_len(n_top)]
+
+    data.frame(
+      LV      = colnames(Z)[i],
+      rank    = seq_len(n_top),
+      gene    = genes[ord],
+      loading = loadings[ord],
+      label   = ifelse(seq_len(n_top) <= label.top,
+                       strtrim(genes[ord], max.name.len),
+                       NA_character_),
+      stringsAsFactors = FALSE
+    )
+  }
+
+  plot_df <- do.call(rbind, lapply(ii, make_lv_df))
+  if (nrow(plot_df) == 0) stop("Selected latent variables have no finite Z loadings.")
+
+  plot_df$LV <- factor(plot_df$LV, levels = colnames(Z)[ii])
+
+  make_plot <- function(lv_name) {
+    df <- plot_df[plot_df$LV == lv_name, , drop = FALSE]
+    label_df <- df[!is.na(df$label), , drop = FALSE]
+
+    ggplot2::ggplot(df, ggplot2::aes(x = .data$rank, y = .data$loading)) +
+      ggplot2::geom_point(size = 1.2, colour = "grey75") +
+      ggplot2::geom_point(data = label_df, colour = "#C23B22", size = 1.6) +
+      ggrepel::geom_text_repel(
+        data = label_df,
+        ggplot2::aes(label = .data$label),
+        size = 3,
+        fontface = "italic",
+        direction = "y",
+        hjust = 0,
+        seed = 42,
+        max.overlaps = Inf,
+        min.segment.length = 0,
+        box.padding = 0.3,
+        point.padding = 0.2,
+        nudge_x = max(1, top * 0.04),
+        segment.color = "grey60",
+        segment.size = 0.25
+      ) +
+      ggplot2::coord_cartesian(clip = "off") +
+      ggplot2::scale_x_continuous(
+        expand = ggplot2::expansion(mult = c(0.02, 0.18))
+      ) +
+      ggplot2::labs(title = as.character(lv_name), x = NULL, y = "Loadings") +
+      ggplot2::theme_classic(base_size = 11) +
+      ggplot2::theme(
+        axis.line    = ggplot2::element_line(colour = "black", linewidth = 0.4),
+        axis.ticks   = ggplot2::element_line(colour = "black", linewidth = 0.35),
+        axis.text.x  = ggplot2::element_blank(),
+        axis.ticks.x = ggplot2::element_blank(),
+        plot.title   = ggplot2::element_text(face = "bold", hjust = 0.5, size = 12),
+        plot.margin  = ggplot2::margin(5.5, 28, 5.5, 5.5)
+      )
+  }
+
+  plots <- lapply(levels(plot_df$LV), make_plot)
+  if (length(plots) == 1) return(plots[[1]])
+
+  patchwork::wrap_plots(plots, ncol = min(2, length(plots)))
+}
+
+#' Dot plot of top pathways for a single latent variable
+#'
+#' Lollipop-style dot plot showing the top pathways associated with one
+#' selected LV. Dot size encodes AUC; dot colour encodes `-log10(FDR)`.
+#' The x-axis and pathway ordering can use either AUC or `-log10(FDR)`.
+#'
+#' @param clampRes A CLAMP result list containing a `summary` data frame, or
+#'   the summary data frame itself.
+#' @param lv LV to plot: either a numeric index (e.g. `1` -> `"LV1"`) or a
+#'   character name (e.g. `"LV3"`). Default `1`.
+#' @param top Maximum number of pathways to display, chosen by `order.by`.
+#'   Default `20`.
+#' @param auc.cutoff Minimum AUC to display. Default `0.6`.
+#' @param fdr.cutoff Maximum FDR to display. Default `0.05`.
+#' @param max.name.len Maximum characters for pathway label trimming.
+#'   Default `50`.
+#' @param x.axis Metric to place on the x-axis. Use `"AUC"` or
+#'   `"-log10(FDR)"`. `"log10FDR"` is also accepted. Default `"AUC"`.
+#' @param order.by Metric used to choose the top pathways and order the y-axis.
+#'   Use `"AUC"` or `"-log10(FDR)"`. `"log10FDR"` is also accepted. Defaults
+#'   to `x.axis`.
+#'
+#' @return Invisibly returns a [ggplot2::ggplot()] object.
+#' @importFrom ggplot2 ggplot aes geom_segment geom_point scale_size_continuous
+#'   scale_colour_gradient scale_x_continuous theme_minimal theme element_text
+#'   element_blank element_line labs unit
+#' @importFrom rlang .data
+#' @export
+#' @examples
+#' set.seed(9)
+#' pathways <- paste0("Pathway_", 1:20)
+#' lvs      <- paste0("LV", 1:5)
+#' nr       <- length(pathways) * length(lvs)
+#'
+#' summ <- data.frame(
+#'   pathway = rep(pathways, length(lvs)),
+#'   LV      = rep(lvs, each = length(pathways)),
+#'   AUC     = runif(nr, 0.5, 1.0),
+#'   FDR     = runif(nr, 0, 0.05),
+#'   stringsAsFactors = FALSE
+#' )
+#'
+#' CLAMPdotplot(list(summary = summ), lv = 1, top = 10)
+#' CLAMPdotplot(list(summary = summ), lv = "LV2", x.axis = "-log10(FDR)",
+#'              order.by = "-log10(FDR)")
+CLAMPdotplot <- function(clampRes, lv = 1, top = 20, auc.cutoff = 0.6,
+                         fdr.cutoff = 0.05, max.name.len = 50,
+                         x.axis = c("AUC", "-log10(FDR)", "log10FDR"),
+                         order.by = x.axis) {
+
+  summ <- if (is.data.frame(clampRes)) clampRes else clampRes$summary
+  if (is.null(summ))
+    stop("'clampRes' must contain a 'summary' data frame or be one itself.")
+
+  if ("LV_index" %in% colnames(summ) && !"LV" %in% colnames(summ))
+    summ$LV <- paste0("LV", summ$LV_index)
+
+  required <- c("pathway", "LV", "AUC", "FDR")
+  missing  <- setdiff(required, colnames(summ))
+  if (length(missing) > 0)
+    stop("summary is missing columns: ", paste(missing, collapse = ", "))
+
+  normalize_dotplot_metric <- function(x) {
+    x <- match.arg(x, c("AUC", "-log10(FDR)", "log10FDR"))
+    if (x == "log10FDR") "-log10(FDR)" else x
+  }
+
+  x.axis <- normalize_dotplot_metric(x.axis)
+  order.by <- normalize_dotplot_metric(order.by)
+
+  lv_name <- if (is.numeric(lv)) paste0("LV", lv) else as.character(lv)
+  df <- summ[summ$LV == lv_name &
+               summ$AUC >= auc.cutoff &
+               summ$FDR <= fdr.cutoff, , drop = FALSE]
+
+  if (nrow(df) == 0) {
+    message("No associations pass the thresholds for ", lv_name, ".")
+    return(invisible(NULL))
+  }
+
+  df$log10_fdr <- -log10(pmax(df$FDR, .Machine$double.eps))
+  x_col <- if (x.axis == "AUC") "AUC" else "log10_fdr"
+  order_col <- if (order.by == "AUC") "AUC" else "log10_fdr"
+
+  df <- df[order(-df[[order_col]], -df$AUC), , drop = FALSE]
+  df <- df[seq_len(min(top, nrow(df))), , drop = FALSE]
+  df$x_value <- df[[x_col]]
+  df$pathway_label <- make.unique(strtrim(df$pathway, max.name.len))
+  df$pathway <- factor(
+    df$pathway_label,
+    levels = df$pathway_label[order(df[[order_col]], df$AUC)]
+  )
+
+  log10_fdr_min <- -log10(max(fdr.cutoff, .Machine$double.eps))
+  log10_fdr_max <- max(df$log10_fdr, na.rm = TRUE)
+  if (log10_fdr_max <= log10_fdr_min)
+    log10_fdr_max <- log10_fdr_min + 1e-6
+
+  x_baseline <- if (x.axis == "AUC") auc.cutoff else log10_fdr_min
+  if (x.axis == "AUC") {
+    x_limits <- c(max(0, auc.cutoff - 0.02), 1)
+    x_label <- "AUC"
+  } else {
+    x_range <- range(c(x_baseline, df$x_value), na.rm = TRUE)
+    x_pad <- diff(x_range) * 0.05
+    if (!is.finite(x_pad) || x_pad == 0) x_pad <- 0.1
+    x_limits <- c(max(0, x_range[1] - x_pad), x_range[2] + x_pad)
+    x_label <- "-log10(FDR)"
+  }
+
+  p <- ggplot2::ggplot(df, ggplot2::aes(
+    x      = .data$x_value,
+    y      = .data$pathway,
+    colour = .data$log10_fdr
+  )) +
+    ggplot2::geom_segment(
+      ggplot2::aes(xend = .data$x_value, yend = .data$pathway),
+      x = x_baseline,
+      colour = "#A1D99B",
+      linewidth = 1
+    ) +
+    ggplot2::geom_point(ggplot2::aes(size = .data$AUC), alpha = 0.9) +
+    ggplot2::scale_size_continuous(
+      name   = "AUC",
+      range  = c(3, 8),
+      limits = c(auc.cutoff, 1)
+    ) +
+    ggplot2::scale_colour_gradient(
+      name   = "-log10(FDR)",
+      low    = "#DCEFD8",
+      high   = "#1B7837",
+      limits = c(log10_fdr_min, log10_fdr_max)
+    ) +
+    ggplot2::scale_x_continuous(
+      limits = x_limits,
+      expand = c(0, 0.01)
+    ) +
+    ggplot2::theme_minimal(base_size = 11) +
+    ggplot2::theme(
+      plot.title         = ggplot2::element_text(hjust = 0.5),
+      axis.text.y        = ggplot2::element_text(size = 9),
+      panel.grid.major.y = ggplot2::element_line(colour = "grey92"),
+      panel.grid.major.x = ggplot2::element_line(colour = "grey92"),
+      panel.grid.minor   = ggplot2::element_blank()
+    ) +
+    ggplot2::labs(title = lv_name, x = x_label, y = NULL)
+
+  p
+}
+
+#' Dot plot of pathway-LV associations across all latent variables
+#'
+#' Produces a dot plot where each point represents one pathway × LV pair.
+#' Dot size encodes the AUC value and dot colour encodes `-log10(FDR)`. Only
+#' associations passing `auc.cutoff` and `fdr.cutoff` are shown.
+#'
+#' @param clampRes A CLAMP result list containing a `summary` data frame with
+#'   columns `pathway`, `LV`, `AUC`, and `FDR`.  Alternatively, `clampRes`
+#'   may be the summary data frame itself.
+#' @param auc.cutoff Minimum AUC to display. Default `0.6`.
+#' @param fdr.cutoff Maximum FDR to display. Default `0.05`.
+#' @param top.per.lv Maximum number of pathways to display per LV, chosen by
+#'   highest AUC. `NULL` shows all. Default `NULL`.
+#' @param max.name.len Maximum characters for pathway label trimming.
+#'   Default `40`.
+#'
+#' @return Invisibly returns a [ggplot2::ggplot()] object.
+#' @importFrom ggplot2 ggplot aes geom_point scale_colour_gradient
+#'   scale_size_continuous theme_minimal theme element_text element_line labs
+#' @importFrom dplyr group_by slice_max ungroup
+#' @importFrom rlang .data
+#' @export
+#' @examples
+#' set.seed(9)
+#' pathways <- paste0("Pathway_", 1:20)
+#' lvs      <- paste0("LV", 1:5)
+#' nr       <- length(pathways) * length(lvs)
+#'
+#' summ <- data.frame(
+#'   pathway = rep(pathways, length(lvs)),
+#'   LV      = rep(lvs, each = length(pathways)),
+#'   AUC     = runif(nr, 0.5, 1.0),
+#'   FDR     = runif(nr, 0, 0.2),
+#'   stringsAsFactors = FALSE
+#' )
+#'
+#' CLAMPdotplotAll(list(summary = summ), auc.cutoff = 0.6, fdr.cutoff = 0.15)
+CLAMPdotplotAll <- function(clampRes, auc.cutoff = 0.6, fdr.cutoff = 0.05,
+                            top.per.lv = NULL, max.name.len = 40) {
+
+  summ <- if (is.data.frame(clampRes)) clampRes else clampRes$summary
+
+  if (is.null(summ))
+    stop("'clampRes' must contain a 'summary' data frame or be one itself.")
+
+  if ("LV_index" %in% colnames(summ) && !"LV" %in% colnames(summ))
+    summ$LV <- paste0("LV", summ$LV_index)
+
+  required <- c("pathway", "LV", "AUC", "FDR")
+  missing  <- setdiff(required, colnames(summ))
+  if (length(missing) > 0)
+    stop("summary is missing columns: ", paste(missing, collapse = ", "))
+
+  df <- summ[summ$AUC >= auc.cutoff & summ$FDR <= fdr.cutoff, , drop = FALSE]
+
+  if (nrow(df) == 0) {
+    message("No associations pass the AUC/FDR thresholds.")
+    return(invisible(NULL))
+  }
+
+  if (!is.null(top.per.lv)) {
+    df <- dplyr::group_by(df, .data$LV)
+    df <- dplyr::slice_max(df, order_by = .data$AUC, n = top.per.lv,
+                           with_ties = FALSE)
+    df <- dplyr::ungroup(df)
+  }
+
+  df$pathway <- strtrim(df$pathway, max.name.len)
+  df$pathway <- factor(df$pathway,
+                       levels = rev(unique(df$pathway[order(df$AUC)])))
+  df$log10_fdr <- -log10(pmax(df$FDR, .Machine$double.eps))
+
+  log10_fdr_min <- -log10(max(fdr.cutoff, .Machine$double.eps))
+  log10_fdr_max <- max(df$log10_fdr, na.rm = TRUE)
+  if (log10_fdr_max <= log10_fdr_min)
+    log10_fdr_max <- log10_fdr_min + 1e-6
+
+  p <- ggplot2::ggplot(df, ggplot2::aes(
+    x      = .data$LV,
+    y      = .data$pathway,
+    size   = .data$AUC,
+    colour = .data$log10_fdr
+  )) +
+    ggplot2::geom_point(alpha = 0.85) +
+    ggplot2::scale_size_continuous(
+      name   = "AUC",
+      range  = c(2, 8),
+      limits = c(auc.cutoff, 1)
+    ) +
+    ggplot2::scale_colour_gradient(
+      name   = "-log10(FDR)",
+      low    = "#DCEFD8",
+      high   = "#1B7837",
+      limits = c(log10_fdr_min, log10_fdr_max)
+    ) +
+    ggplot2::theme_minimal(base_size = 11) +
+    ggplot2::theme(
+      axis.text.x      = ggplot2::element_text(angle = 45, hjust = 1),
+      axis.text.y      = ggplot2::element_text(size = 8),
+      panel.grid.major = ggplot2::element_line(colour = "grey92")
+    ) +
+    ggplot2::labs(x = "Latent Variable", y = "Pathway")
+
+  p
+}
