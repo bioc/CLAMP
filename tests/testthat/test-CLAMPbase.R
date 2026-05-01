@@ -18,4 +18,10 @@ test_that("CLAMPbase and returns B, Z, U", {
   
   expect_type(base, "list")
   expect_true(all(c("B", "Z") %in% names(base)))
+  expect_true(is.matrix(base$B))
+  expect_true(is.matrix(base$Z))
+  expect_equal(rownames(base$Z), rownames(dataWholeBlood))
+  expect_equal(colnames(base$B), colnames(dataWholeBlood))
+  expect_equal(rownames(base$B), colnames(base$Z))
+  expect_equal(rownames(base$B), paste0("LV", seq_len(nrow(base$B))))
 })
