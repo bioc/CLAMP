@@ -565,10 +565,10 @@ crossVal <- function(clampRes, priorMat, priorMatcv) {
 
       results[[length(results) + 1]] <- data.frame(
         pathway  = colnames(priorMat)[j],
-        LV_index = i,
-        AUC      = aucres$auc,
-        p_value  = aucres$pval,
-        FDR      = NA_real_,   # placeholder
+        LV       = paste0("LV", i),
+        AUC      = as.numeric(aucres$auc),
+        p_value  = as.numeric(aucres$pval),
+        FDR      = NA_real_,
         npos     = aucres$npos,
         nneg     = aucres$nneg,
         stringsAsFactors = FALSE
@@ -580,7 +580,8 @@ crossVal <- function(clampRes, priorMat, priorMatcv) {
   }
 
   out <- do.call(rbind, results)
-  out$FDR <- BH(out$p_value)
+  out$FDR <- as.numeric(BH(out$p_value))
+  out$AUC <- as.numeric(out$AUC)
 
   return(list(Uauc = Uauc, Upval = Up, summary = out))
 }
@@ -808,6 +809,8 @@ CLAMPbase <- function(
   }
 
   rownames(B) <- colnames(Z) <- paste0("LV", seq_len(clamp_k))
+  if (!is.null(rownames(Y))) rownames(Z) <- rownames(Y)
+  if (!is.null(colnames(Y))) colnames(B) <- colnames(Y)
 
   if (ncores > 1) {
     # restore previous state
@@ -815,7 +818,7 @@ CLAMPbase <- function(
     options(default.nproc.blas = blas_nproc)
   }
 
-  return(list(B = B, Z = Z, Zraw = Zraw, L1 = L1, L2 = L2))
+  return(list(B = as.data.frame(B), Z = as.data.frame(Z), Zraw = Zraw, L1 = L1, L2 = L2))
 
 }
 
@@ -1195,7 +1198,9 @@ CLAMPfullnVP <- function(
   }
 
   rownames(U) <- colnames(priorMat)
-  colnames(U) <- rownames(B) <- paste0("LV", seq_len(clamp_k))
+  colnames(U) <- rownames(B) <- colnames(Z) <- paste0("LV", seq_len(clamp_k))
+  if (!is.null(rownames(Y))) rownames(Z) <- rownames(Y)
+  if (!is.null(colnames(Y))) colnames(B) <- colnames(Y)
 
   out <- list(B = B, Z = Z, U = U, C = C, L1 = L1, L2 = L2, heldOutGenes = heldOutGenes)
 
@@ -1224,9 +1229,9 @@ CLAMPfullnVP <- function(
     message("Not using cross-validation. No AUCs or p-values")
   }
 
-  # currently not working
-  # rownames(out$B)=nameB(out)
   out$call <- call <- match.call()
+  out$Z <- as.data.frame(out$Z)
+  out$B <- as.data.frame(out$B)
 
   if (ncores > 1) {
     # restore previous state
@@ -1973,8 +1978,9 @@ CLAMPfull <- function(
   }
 
   rownames(U) <- colnames(priorMat)
-  colnames(U) <- rownames(B) <- paste0("LV", seq_len(clamp_k))
+  colnames(U) <- rownames(B) <- colnames(Z) <- paste0("LV", seq_len(clamp_k))
   rownames(Z) <- rownames(Y)
+  if (!is.null(colnames(Y))) colnames(B) <- colnames(Y)
 
   out <- list(B = B, Z = Z, U = U, C = C, L1 = L1, L2 = L2, Z2=Z2,heldOutGenes = heldOutGenes)
 
@@ -2003,6 +2009,8 @@ CLAMPfull <- function(
   }
 
   out$call <- match.call()
+  out$Z <- as.data.frame(out$Z)
+  out$B <- as.data.frame(out$B)
   out
 }
 
