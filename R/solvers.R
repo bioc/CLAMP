@@ -1289,11 +1289,7 @@ projectCLAMP <- function(CLAMPres, newdata, scale = 1, ncores = 1,
   if (is.null(CLAMPres$Z)) stop("'CLAMPres' must contain a 'Z' matrix.")
   if (is.null(CLAMPres$L2)) stop("'CLAMPres' must contain an 'L2' value.")
 
-  Z_matrix <- if (inherits(CLAMPres$Z, "Matrix")) {
-    as.matrix(CLAMPres$Z)
-  } else {
-    CLAMPres$Z
-  }
+  Z_matrix <- as.matrix(CLAMPres$Z)
 
   z_genes <- rownames(Z_matrix)
   new_genes <- rownames(newdata)
