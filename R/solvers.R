@@ -818,7 +818,7 @@ CLAMPbase <- function(
     options(default.nproc.blas = blas_nproc)
   }
 
-  return(list(B = as.data.frame(B), Z = as.data.frame(Z), Zraw = Zraw, L1 = L1, L2 = L2))
+  return(list(B = as.matrix(B), Z = as.matrix(Z), Zraw = Zraw, L1 = L1, L2 = L2))
 
 }
 
@@ -1230,8 +1230,8 @@ CLAMPfullnVP <- function(
   }
 
   out$call <- call <- match.call()
-  out$Z <- as.data.frame(out$Z)
-  out$B <- as.data.frame(out$B)
+  out$Z <- as.matrix(out$Z)
+  out$B <- as.matrix(out$B)
 
   if (ncores > 1) {
     # restore previous state
@@ -1289,7 +1289,11 @@ projectCLAMP <- function(CLAMPres, newdata, scale = 1, ncores = 1,
   if (is.null(CLAMPres$Z)) stop("'CLAMPres' must contain a 'Z' matrix.")
   if (is.null(CLAMPres$L2)) stop("'CLAMPres' must contain an 'L2' value.")
 
-  Z_matrix <- as.matrix(CLAMPres$Z)
+  Z_matrix <- if (inherits(CLAMPres$Z, "Matrix")) {
+    as.matrix(CLAMPres$Z)
+  } else {
+    CLAMPres$Z
+  }
 
   z_genes <- rownames(Z_matrix)
   new_genes <- rownames(newdata)
@@ -2005,8 +2009,8 @@ CLAMPfull <- function(
   }
 
   out$call <- match.call()
-  out$Z <- as.data.frame(out$Z)
-  out$B <- as.data.frame(out$B)
+  out$Z <- as.matrix(out$Z)
+  out$B <- as.matrix(out$B)
   out
 }
 
