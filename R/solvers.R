@@ -617,6 +617,9 @@ crossVal <- function(clampRes, priorMat, priorMatcv) {
 #' @param cutoff Scalar threshold to zero Z values when \code{Zpos = TRUE} and adaptive thresholding
 #' is not used. Default is 0.
 #' @param ncores Number of cores to use for parallel computation (only used if Y is an FBM). Default is 1.
+#' @param clamp_k_method Method for selecting `clamp_k` when not provided.
+#'   One of `"elbow"` (default), `"permutation"`, `"gavish_donoho"`, or
+#'   `"scaleSVs"`. Passed to [select_clamp_k()].
 #' @return A list with components:
 #' \describe{
 #'   \item{\code{B}}{Latent variable loadings (LVs x genes)}
@@ -645,7 +648,7 @@ CLAMPbase <- function(
     Y, clamp_k = NULL, svd_k = NULL, svdres = NULL, L1 = NULL, L2 = NULL,
     Zpos = TRUE, max.iter = 200, tol = 5e-4, trace = FALSE,
     rseed = NULL, B = NULL, scale = 1, pos.adj = 3, adaptive.p = 0.05, adaptive.iter = 20,
-    cutoff = 0, ncores = 1) {
+    cutoff = 0, ncores = 1, clamp_k_method = "elbow") {
   if (ncores > 1) {
     # if we are parallelizing, then disable BLAS parallelization
     options(bigstatsr.check.parallel.blas = FALSE)
@@ -667,42 +670,22 @@ CLAMPbase <- function(
   message("****")
 
   if (is.null(svd_k)) {
-    n_genes   <- nrow(Y)
-    n_samples <- ncol(Y)
-    svd_k <- max(2, min(n_genes, n_samples) - 1)
+    svd_k <- select_svd_k(Y)
+    if (!is.null(clamp_k)) svd_k <- max(svd_k, clamp_k)
   }
   
   if (is.null(svdres) && is.null(B)) {
     message("Computing SVD")
-    if (is_fbm) {
-      # For FBM, we need special handling for SVD
-      if (requireNamespace("bigstatsr", quietly = TRUE)) {
-        # Use big_SVD from bigstatsr if available
-        svdres <- bigstatsr::big_SVD(X = Y, k = svd_k)
-      } else {
-        # Fallback: convert to regular matrix for SVD
-        # This might be memory-intensive for large matrices
-        svdres <- rsvd(Y, k = svd_k)
-      }
-    } else if (is_sparse) {
-      # For sparse matrices, use irlba or other sparse SVD methods
-      if (requireNamespace("irlba", quietly = TRUE)) {
-        svdres <- irlba::irlba(Y, nv = svd_k)
-      } else {
-        svdres <- rsvd(Y, k = svd_k)
-      }
-    } else {
-      # Regular matrix
-      svdres <- rsvd(Y, k = svd_k)
-    }
+    svdres <- compute_svd(Y, k = svd_k)
   }
 
   svdres <- rotateSVD(svdres)
 
   if(is.null(clamp_k)){
-    scale.res <- getScaleFromSVs(svdres$d, ncol(Y))
-    clamp_k <- min(floor(scale.res$k*1.5), svd_k)
-    d <- scale.res$scale
+    auto <- select_clamp_k(svdres, n_samples = ncol(Y), svd_k = svd_k,
+                           method = clamp_k_method, data = Y)
+    clamp_k <- auto$clamp_k
+    d <- auto$scale
   } else {
     d <- svdres$d[clamp_k]
   }
@@ -861,6 +844,9 @@ CLAMPbase <- function(
 #' @param useSE Logical; passed to the internal \code{solveU()} call. If \code{TRUE},
 #'  enables standard-error–aware selection when fitting U (pathway coefficients). Default is \code{FALSE}.
 #' @param ncores Number of cores to use for parallel computation (only used if Y is an FBM). Default is 1.
+#' @param clamp_k_method Method for selecting `clamp_k` when not provided.
+#'   One of `"elbow"` (default), `"permutation"`, `"gavish_donoho"`, or
+#'   `"scaleSVs"`. Passed to [select_clamp_k()].
 #' @return A list with the following components:
 #' \describe{
 #'   \item{\code{B}}{Latent variable loadings (LVs x genes)}
@@ -900,7 +886,8 @@ CLAMPfullnVP <- function(
     penalty.factor = rep(1, ncol(priorMat)), glm_alpha = 0.9,
     minGenes = 10, tol = 5e-4, seed = 123456, allGenes = FALSE, rseed = NULL,
     max.U.updates = 5, pathwaySelection = c("fast"), multiplier = 1,
-    adaptive.p = 0.05, useNNLS = TRUE, useRaw = TRUE, refitAll = FALSE, useSE = FALSE, ncores = 1) {
+    adaptive.p = 0.05, useNNLS = TRUE, useRaw = TRUE, refitAll = FALSE, useSE = FALSE, ncores = 1,
+    clamp_k_method = "elbow") {
   
   if (ncores > 1) {
     # if we are parallelizing, then disable BLAS parallelization
@@ -981,34 +968,13 @@ CLAMPfullnVP <- function(
   }
 
   if (is.null(svd_k) && is.null(clamp.base.result)) {
-    n_genes   <- nrow(Y)
-    n_samples <- ncol(Y)
-    svd_k <- max(2, min(n_genes, n_samples) - 1)
+    svd_k <- select_svd_k(Y)
+    if (!is.null(clamp_k)) svd_k <- max(svd_k, clamp_k)
   }
 
- if (is.null(svdres) && is.null(clamp.base.result)) {
+  if (is.null(svdres) && is.null(clamp.base.result)) {
     message("Computing SVD")
-    if (is_fbm) {
-      # For FBM, we need special handling for SVD
-      if (requireNamespace("bigstatsr", quietly = TRUE)) {
-        # Use big_SVD from bigstatsr if available
-        svdres <- bigstatsr::big_SVD(X = Y, k = svd_k)
-      } else {
-        # Fallback: convert to regular matrix for SVD
-        # This might be memory-intensive for large matrices
-        svdres <- rsvd(Y, k = svd_k)
-      }
-    } else if (is_sparse) {
-      # For sparse matrices, use irlba or other sparse SVD methods
-      if (requireNamespace("irlba", quietly = TRUE)) {
-        svdres <- irlba::irlba(Y, nv = svd_k)
-      } else {
-        svdres <- rsvd(Y, k = svd_k)
-      }
-    } else {
-      # Regular matrix
-      svdres <- rsvd(Y, k = svd_k)
-    }
+    svdres <- compute_svd(Y, k = svd_k)
   }
 
   if (is.null(svdres) && is.null(clamp.base.result)) {
@@ -1016,9 +982,10 @@ CLAMPfullnVP <- function(
   }
   
   if(is.null(clamp.base.result)){
-    scale.res <- getScaleFromSVs(svdres$d, ncol(Y))
-    clamp_k <- min(floor(scale.res$k*1.5), svd_k)
-    d <- scale.res$scale
+    auto <- select_clamp_k(svdres, n_samples = ncol(Y), svd_k = svd_k,
+                           method = clamp_k_method, data = Y)
+    clamp_k <- auto$clamp_k
+    d <- auto$scale
   } else {
     d <- svdres$d[clamp_k]
   }
@@ -1605,6 +1572,9 @@ ridge_B <- function(Y, Z, L2k) {
 #' @param robust.vp Logical; winsorize prior-predicted Z2 values to reduce outlier effects. Default: \code{TRUE}.
 #' @param useSE Logical; whether to use the 1-standard-error rule for internal glmnet fitting. Default is FALSE.
 #' @param use_cpp Logical; if TRUE, use C++ implementation for Z updates. Default is FALSE.
+#' @param clamp_k_method Method for selecting `clamp_k` when not provided.
+#'   One of `"elbow"` (default), `"permutation"`, `"gavish_donoho"`, or
+#'   `"scaleSVs"`. Passed to [select_clamp_k()].
 #' @return A list with elements:
 #' \describe{
 #'   \item{\code{B}}{LV loadings on samples (k × samples)}
@@ -1649,7 +1619,8 @@ CLAMPfull <- function(
     minGenes = 0, tol = 5e-4, seed = 123456, allGenes = FALSE, rseed = NULL,
     max.U.updates = Inf, pathwaySelection = c("fast", "complete"),  multiplier = 5,
     adaptive.p = 0.05, useNNLS = TRUE, useRaw = TRUE, refitEvery = 3,
-    useSE = FALSE, var.prior = TRUE, Uscale = FALSE, robust.vp = TRUE, use_cpp=FALSE) {
+    useSE = FALSE, var.prior = TRUE, Uscale = FALSE, robust.vp = TRUE, use_cpp=FALSE,
+    clamp_k_method = "elbow") {
   
   if (is.infinite(max.U.updates)) max.U.updates <- max.iter
 
@@ -1743,34 +1714,13 @@ CLAMPfull <- function(
   }
 
   if (is.null(svd_k) && is.null(clamp.base.result)) {
-    n_genes   <- nrow(Y)
-    n_samples <- ncol(Y)
-    svd_k <- max(2, min(n_genes, n_samples) - 1)
+    svd_k <- select_svd_k(Y)
+    if (!is.null(clamp_k)) svd_k <- max(svd_k, clamp_k)
   }
 
- if (is.null(svdres) && is.null(clamp.base.result)) {
+  if (is.null(svdres) && is.null(clamp.base.result)) {
     message("Computing SVD")
-    if (is_fbm) {
-      # For FBM, we need special handling for SVD
-      if (requireNamespace("bigstatsr", quietly = TRUE)) {
-        # Use big_SVD from bigstatsr if available
-        svdres <- bigstatsr::big_SVD(X = Y, k = svd_k)
-      } else {
-        # Fallback: convert to regular matrix for SVD
-        # This might be memory-intensive for large matrices
-        svdres <- rsvd(Y, k = svd_k)
-      }
-    } else if (is_sparse) {
-      # For sparse matrices, use irlba or other sparse SVD methods
-      if (requireNamespace("irlba", quietly = TRUE)) {
-        svdres <- irlba::irlba(Y, nv = svd_k)
-      } else {
-        svdres <- rsvd(Y, k = svd_k)
-      }
-    } else {
-      # Regular matrix
-      svdres <- rsvd(Y, k = svd_k)
-    }
+    svdres <- compute_svd(Y, k = svd_k)
   }
 
   if (is.null(svdres) && is.null(clamp.base.result)) {
@@ -1778,9 +1728,10 @@ CLAMPfull <- function(
   }
   
   if(is.null(clamp.base.result)){
-    scale.res <- getScaleFromSVs(svdres$d, ncol(Y))
-    clamp_k <- min(floor(scale.res$k*1.5), svd_k)
-    d <- scale.res$scale
+    auto <- select_clamp_k(svdres, n_samples = ncol(Y), svd_k = svd_k,
+                           method = clamp_k_method, data = Y)
+    clamp_k <- auto$clamp_k
+    d <- auto$scale
   } else {
     d <- svdres$d[clamp_k]
   }
