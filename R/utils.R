@@ -1028,13 +1028,8 @@ compute_svd <- function(Y, k = NULL) {
 #'   internally) and `"gavish_donoho"` (used for `n_genes`).
 #' @param B Number of permutations for `"permutation"`.
 #' 
-#' @return A list with:
-#'   \describe{
-#'     \item{`clamp_k`}{Selected number of latent variables.}
-#'     \item{`scale`}{Scale value used downstream for default L1 / L2
-#'       regularization.}
-#'   }
-#' 
+#' @return An integer: the selected number of latent variables.
+#'
 #' @export
 select_clamp_k <- function(svdres, n_samples, svd_k,
                            method = c("elbow", "permutation",
@@ -1044,8 +1039,7 @@ select_clamp_k <- function(svdres, n_samples, svd_k,
 
   if (method == "scaleSVs") {
     scale.res <- getScaleFromSVs(svdres$d, n_samples)
-    clamp_k <- min(floor(scale.res$k * 1.5), svd_k)
-    return(list(clamp_k = clamp_k, scale = scale.res$scale))
+    return(min(floor(scale.res$k * 1.5), svd_k))
   }
 
   if (method == "elbow") {
@@ -1067,6 +1061,5 @@ select_clamp_k <- function(svdres, n_samples, svd_k,
     )
   }
 
-  clamp_k <- min(clamp_k * 2, svd_k)
-  list(clamp_k = clamp_k, scale = svdres$d[clamp_k])
+  min(clamp_k * 2, svd_k)
 }

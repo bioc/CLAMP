@@ -595,7 +595,7 @@ crossVal <- function(clampRes, priorMat, priorMatcv) {
 #'
 #' @param Y Input gene expression matrix (genes x samples). Can be dense, sparse (\code{dgCMatrix}), or FBM.
 #' @param clamp_k Number of latent variables for CLAMP (final model rank).
-#'   If \code{NULL}, it is chosen from the SVD via \code{getScaleFromSVs}.
+#'   If \code{NULL}, it is chosen automatically via \code{select_clamp_k()}.
 #' @param svd_k Number of singular values/components to compute in the SVD.
 #'   If \code{NULL}, defaults to \code{max(2, min(n_genes, n_samples) - 1)}.
 #' @param svdres Optional precomputed SVD result. If not supplied, it is computed internally.
@@ -683,10 +683,9 @@ CLAMPbase <- function(
   svdres <- rotateSVD(svdres)
 
   if(is.null(clamp_k)){
-    auto <- select_clamp_k(svdres, n_samples = ncol(Y), svd_k = svd_k,
-                           method = clamp_k_method, data = Y)
-    clamp_k <- auto$clamp_k
-    d <- auto$scale
+    clamp_k <- select_clamp_k(svdres, n_samples = ncol(Y), svd_k = svd_k,
+                              method = clamp_k_method, data = Y)
+    d <- svdres$d[clamp_k]
   } else {
     d <- svdres$d[clamp_k]
   }
@@ -816,7 +815,7 @@ CLAMPbase <- function(
 #' @param svdres Optional SVD result used for initialization.
 #' @param clamp.base.result Optional result from \code{CLAMPbase()} to initialize B.
 #' @param clamp_k Number of latent variables for CLAMP (final model rank).
-#'   If \code{NULL}, it is chosen from the SVD via \code{getScaleFromSVs}.
+#'   If \code{NULL}, it is chosen automatically via \code{select_clamp_k()}.
 #' @param svd_k Number of singular values/components to compute in the SVD.
 #'   If \code{NULL}, defaults to \code{max(2, min(n_genes, n_samples) - 1)}.
 #' @param L1 Regularization strength for Z. If \code{NULL}, initialized from SVD or \code{clamp.base.result}.
@@ -985,10 +984,9 @@ CLAMPfullnVP <- function(
   }
   
   if(is.null(clamp.base.result)){
-    auto <- select_clamp_k(svdres, n_samples = ncol(Y), svd_k = svd_k,
-                           method = clamp_k_method, data = Y)
-    clamp_k <- auto$clamp_k
-    d <- auto$scale
+    clamp_k <- select_clamp_k(svdres, n_samples = ncol(Y), svd_k = svd_k,
+                              method = clamp_k_method, data = Y)
+    d <- svdres$d[clamp_k]
   } else {
     d <- svdres$d[clamp_k]
   }
@@ -1547,7 +1545,7 @@ ridge_B <- function(Y, Z, L2k) {
 #' @param svdres Optional precomputed SVD result for initialization.
 #' @param clamp.base.result Optional result from \code{CLAMPbase()} providing initial values.
 #' @param clamp_k Number of latent variables for CLAMP (final model rank).
-#'   If \code{NULL}, it is chosen from the SVD via \code{getScaleFromSVs}.
+#'   If \code{NULL}, it is chosen automatically via \code{select_clamp_k()}.
 #' @param svd_k Number of singular values/components to compute in the SVD.
 #'   If \code{NULL}, defaults to \code{max(2, min(n_genes, n_samples) - 1)}.
 #' @param L1,L2 Regularization parameters for \code{Z} and \code{B}. Defaults use values from
@@ -1733,10 +1731,9 @@ CLAMPfull <- function(
   }
   
   if(is.null(clamp.base.result)){
-    auto <- select_clamp_k(svdres, n_samples = ncol(Y), svd_k = svd_k,
-                           method = clamp_k_method, data = Y)
-    clamp_k <- auto$clamp_k
-    d <- auto$scale
+    clamp_k <- select_clamp_k(svdres, n_samples = ncol(Y), svd_k = svd_k,
+                              method = clamp_k_method, data = Y)
+    d <- svdres$d[clamp_k]
   } else {
     d <- svdres$d[clamp_k]
   }
