@@ -48,21 +48,96 @@ Full documentation is available at [chikinalab.org/CLAMP](https://chikinalab.org
 ``` r
 library(CLAMP)
 
+set.seed(1)
+
 # Load example dataset (genes × samples)
 data("dataWholeBlood")
 
 # CPM-normalize, filter low-expressed genes, log2 and z-score normalizations
 dataWholeBlood_cpm <- cpmCLAMP(dataWholeBlood)
-prep <- preprocessCLAMP(dataWholeBlood_cpm, mean_cutoff = 0.5, var_cutoff = 0.1)
-Y_z  <- zscoreCLAMP(prep$Y_filtered, prep$rowStats)
+
+prep <- preprocessCLAMP(
+    dataWholeBlood_cpm,
+    mean_cutoff = 0.5,
+    var_cutoff = 0.1
+)
+
+Y_z <- zscoreCLAMP(
+    prep$Y_filtered,
+    prep$rowStats
+)
 
 # Compute truncated SVD and select number of latent variables
-svd_k    <- select_svd_k(Y_z)
-svd_res  <- compute_svd(Y_z, k = svd_k)
-clamp_k  <- select_clamp_k(svd_res, n_samples = ncol(Y_z), svd_k = svd_k)
+svd_k <- select_svd_k(Y_z)
+
+svd_res <- compute_svd(
+    Y_z,
+    k = svd_k
+)
+
+clamp_k <- select_clamp_k(
+    svd_res,
+    n_samples = ncol(Y_z),
+    svd_k = svd_k
+)
 
 # Run CLAMPbase to initialize latent variables
-baseRes <- CLAMPbase(Y = Y_z, svdres = svd_res, clamp_k = clamp_k)
+baseRes <- CLAMPbase(
+    Y = Y_z,
+    svdres = svd_res,
+    clamp_k = clamp_k
+)
+
+# Load pre-fetched gene set libraries bundled with the package
+gmtList <- list(
+    CellMarkers = readRDS(
+        system.file("extdata", "CellMarker_2024.rds", package = "CLAMP")
+    ),
+    KEGG = readRDS(
+        system.file("extdata", "KEGG_2021_Human.rds", package = "CLAMP")
+    )
+)
+
+# Combine gene set libraries into a single sparse matrix
+pathMatCell <- gmtListToSparseMat(gmtList)
+
+# Load additional xCell reference matrix
+data("xCell")
+
+# Match pathways to the filtered gene space used by CLAMP
+matchedPathsWB <- getMatchedPathwayMatList(
+    pathMatCell,
+    xCell,
+    new.genes = rownames(Y_z),
+    min.genes = 2
+)
+
+# Run CLAMPfull using CLAMPbase initialization and matched priors
+fullRes <- CLAMPfull(
+    Y = Y_z,
+    priorMat = matchedPathsWB,
+    clamp.base.result = baseRes,
+    svdres = svd_res,
+    clamp_k = clamp_k,
+    use_cpp = TRUE
+)
+
+# Inspect outputs
+dim(fullRes$Z)
+dim(fullRes$B)
+dim(fullRes$U)
+
+# Inspect significant pathway annotations
+summary_df <- as.data.frame(fullRes$summary)
+
+sig_summary <- summary_df[
+    summary_df$FDR < 0.05 & summary_df$AUC > 0.7,
+    c("LV", "pathway", "FDR", "AUC")
+]
+
+sig_summary <- sig_summary[order(sig_summary$FDR), ]
+
+head(sig_summary, 20)
 ```
 
 ## Code of Conduct
