@@ -31,7 +31,7 @@ BiocManager::install("CLAMP")
 If you want to test the development version, you can install it from the github repository:
 
 ``` r
-BiocManager::install("mchikina/CLAMP")
+BiocManager::install("chikinalab/CLAMP")
 ```
 
 Now you can load the package using:
@@ -42,7 +42,7 @@ library(CLAMP)
 
 ## Basic usage
 
-Full documentation is available at [chikinalab.org/CLAMP](https://chikinalab.org/CLAMP/). For detailed instructions on how to use CLAMP, please see the [vignette](https://mchikina.github.io/CLAMP/articles/get_started.html).
+Full documentation is available at [chikinalab.org/CLAMP](https://chikinalab.org/CLAMP/). For detailed instructions on how to use CLAMP, please see the [vignette](https://chikinalab.github.io/CLAMP/articles/get_started.html).
 
 ``` r
 library(CLAMP)
