@@ -51,7 +51,7 @@ library(CLAMP)
 # Load example dataset (genes × samples)
 data("dataWholeBlood")
 
-# CPM-normalize, filter low-expressed genes, and z-score
+# CPM-normalize, filter low-expressed genes, log2 and z-score normalizations
 dataWholeBlood_cpm <- cpmCLAMP(dataWholeBlood)
 prep <- preprocessCLAMP(dataWholeBlood_cpm, mean_cutoff = 0.5, var_cutoff = 0.1)
 Y_z  <- zscoreCLAMP(prep$Y_filtered, prep$rowStats)
