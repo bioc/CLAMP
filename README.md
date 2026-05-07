@@ -1,7 +1,7 @@
 # CLAMP <img src="man/figures/clamp.png" width="121px" height="140px" align="right" style="padding-left:10px;background-color:white;" />
 
 <!-- badges: start -->
-[![GitHub issues](https://img.shields.io/github/issues/mchikina/CLAMP)](https://github.com/mchikina/mchikina/CLAMP)
+[![GitHub issues](https://img.shields.io/github/issues/mchikina/CLAMP)](https://github.com/chikinalab/CLAMP/issues)
 [![Lifecycle: stable](https://img.shields.io/badge/lifecycle-stable-green.svg)](https://lifecycle.r-lib.org/articles/stages.html#stable)
 [![BiocCheck](https://github.com/chikinalab/CLAMP/actions/workflows/BiocCheck.yaml/badge.svg)](https://github.com/chikinalab/CLAMP/actions/workflows/BiocCheck.yaml)
 [![R-CMD-check](https://github.com/chikinalab/CLAMP/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/chikinalab/CLAMP/actions/workflows/R-CMD-check.yaml)
