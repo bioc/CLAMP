@@ -7,4 +7,6 @@ tmp_scripts
 *.DS_Store
 .vscode/*
 output/*
-src/*
+src/CLAMP.so
+src/RcppExports.o
+src/updateZ.o
