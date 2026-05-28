@@ -5,3 +5,6 @@
 .Ruserdata
 tmp_scripts
 *.DS_Store
+.vscode/*
+output/*
+src/*
