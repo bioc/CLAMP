@@ -408,9 +408,7 @@ datatable(
     formatSignif(c("AUC", "FDR"), 3)
 ```
 
-The recovered LVs are biologically coherent for whole blood. LV2 is linked
-to Ribosome and Proteasome programmes, reflecting the high protein turnover
-characteristic of circulating blood cells. LV13 aligns with neutrophil
+The recovered LVs are biologically coherent for whole blood. LV13 aligns with neutrophil
 signatures, LV10 with platelets, LV14 with erythrocytes, LV12 with NK cells,
 and LV11 with plasma cells, covering the major cellular constituents of whole
 blood. Together, these results indicate that CLAMP successfully decomposes the
@@ -576,13 +574,11 @@ datatable(
     formatSignif(c("AUC", "FDR"), 3)
 ```
 
-The significant LVs are well-aligned with Alzheimer's disease brain tissue.
-LV3 and LV1 are strongly associated with GTEx gene expression profiles from
-frontal cortex, substantia nigra, and spinal cord, confirming that the
-dominant axes of variation reflect genuine neural transcriptional states
-rather than technical noise. The presence of multiple brain-region-specific
-signatures across a small number of LVs is consistent with the cellular and
-regional heterogeneity expected in Alzheimer's disease bulk brain samples.
+The significant LVs align with brain-relevant transcriptional programs implicated in Alzheimer’s disease.
+LV3 and LV10 are enriched for GTEx brain-region signatures, including spinal cord, substantia nigra,
+frontal cortex, and cortex, suggesting that these axes capture genuine neural transcriptional variation.
+LV1 further supports disease relevance through enrichment for mitochondrial respiration and oxidative phosphorylation pathways,
+which are linked to impaired brain energy metabolism in Alzheimer’s disease.
 
 # Example 3: Tab-Delimited Count File (Pancreatic Islets)
 
@@ -741,12 +737,10 @@ datatable(
     formatSignif(c("AUC", "FDR"), 3)
 ```
 
-The significant LVs reflect known pancreatic islet biology. LV20 and LV16
-correspond to opposing alpha- and beta-cell identity programmes, capturing
-the major endocrine cell types of the islet. LV6 aligns with a
-pancreas-specific GTEx tissue signature, confirming tissue identity. LV17
-maps to TNF-alpha signalling via NF-kB, an inflammatory pathway central to
-T2D pathogenesis. The results are biologically coherent and disease-relevant.
+The significant LVs reflect key biological processes relevant to type 2 diabetes. 
+LV20 and LV16 capture alpha- and beta-cell identity programs, highlighting pancreatic islet endocrine biology. 
+LV21 aligns with pancreas-specific GTEx tissue signatures, supporting tissue relevance, 
+while LV1 captures oxidative phosphorylation, protein secretion, and beta-cell-related programs. 
 
 ## Differential latent-variable expression between conditions
 
@@ -789,17 +783,12 @@ datatable(
     formatSignif(c("AUC", "FDR"), 3)
 ```
 
-The differentially active LVs between T2D and ND donors are biologically
-coherent with T2D pathogenesis. LV17, the top-ranked LV, is associated with
-TNF-alpha signalling via NF-kB and interferon alpha and gamma response
-programmes, canonical inflammatory pathways activated in islets under diabetic
-conditions. LV9 maps to EBV-transformed lymphocyte signatures, consistent with
-immune cell infiltration into islets during T2D progression. LV3 links to
-whole-blood and diabetic mouse islet gene sets, suggesting a shared
-inflammatory transcriptional signature between blood and affected islet tissue.
-LV5 aligns with adipose tissue signatures, reflecting the metabolic context of
-T2D. Together, the recovered programmes point to inflammation and immune
-activation as the dominant axes distinguishing T2D from healthy donors.
+The top differentially active LVs highlight biological axes distinguishing T2D from ND islets. 
+LV7 links to diabetic adipose tissue and TNF-alpha signaling via NF-kB, consistent with inflammation and metabolic dysfunction.
+LV20 and LV16 map to alpha- and beta-cell programs. 
+LV9 and LV3 are associated with islet perturbation and diabetic mouse islet signatures, 
+supporting disease-relevant changes in islet transcriptional states,
+while LV10 suggests a vascular component relevant to T2D.
 
 # Projection: Applying one CLAMP model to another dataset
 
