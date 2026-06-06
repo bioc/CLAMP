@@ -59,7 +59,7 @@ Suggests:
     data.table,
     DiagrammeR,
     DT,
-    hdf5r,
+    rhdf5,
     here,
     knitr,
     org.Hs.eg.db,
@@ -77,3 +77,4 @@ LazyData: false
 Roxygen: list(markdown = TRUE)
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.0.0
+RoxygenNote: 7.3.3
