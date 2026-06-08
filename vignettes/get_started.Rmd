@@ -58,7 +58,7 @@ library(dplyr)
 library(rsvd)
 library(glmnet)
 library(Matrix)
-library(hdf5r)
+library(rhdf5)
 library(data.table)
 library(bigstatsr)
 library(here)
@@ -196,6 +196,15 @@ grViz('
 ```
 
 # Quick Start
+
+## Available datasets
+
+CLAMPData ships three curated datasets used throughout this vignette. You can
+inspect them with `list_clamp_data()`:
+
+```{r list-clamp-data}
+list_clamp_data()
+```
 
 We provide three examples:
 
@@ -433,17 +442,22 @@ For file-backed matrices (FBMs), you can compute counts-per-million (CPM)
 in-place—without loading the entire dataset into RAM—using the 
 `cpmCLAMPFBM()` function from **CLAMP**:
 
+## HDF5 schema
+
+CLAMP HDF5 files follow a fixed layout. You can inspect the expected structure with `clamp_h5_schema()`:
+
+```{r alz-schema}
+clamp_h5_schema()
+```
+
 ## Load HDF5 expression
 
+`read_clamp_alz_expression()` downloads the file via ExperimentHub, validates it
+against the schema, and returns a genes × samples matrix with row and column names ready to use.
+
 ```{r hdf5-load, message=FALSE}
-alz_path <- human_gene_v2_5_alz_h5()
-h5 <- H5File$new(alz_path, mode = "r")
-expr_mat <- t(h5[["data/expression"]]$read())
-genes <- h5[["meta/genes/symbol"]]$read()
-samples <- h5[["meta/samples/geo_accession"]]$read()
-h5$close_all()
-colnames(expr_mat) <- samples
-rownames(expr_mat) <- genes
+expr_mat <- read_clamp_alz_expression()
+genes <- rownames(expr_mat)
 ```
 
 ## Construct file‑backed FBM
@@ -591,11 +605,7 @@ diabetic (T2D) samples.
 ## Load count data and map gene symbols
 
 ```{r islet-load, message=FALSE}
-islet_file <- GSE164416_DP_htseq_counts_txt_gz()
-islet_df <- read.table(
-    gzfile(islet_file),
-    header = TRUE, stringsAsFactors = FALSE
-)
+islet_df <- read_islet_counts()
 
 islet_df$symbol <- mapIds(org.Hs.eg.db,
     keys = islet_df$ensembl,
@@ -750,8 +760,7 @@ LV expression per group and tests for LVs that differ between healthy and
 diabetic islets.
 
 ```{r islet-diff, message=FALSE}
-islet_meta <- islets_metadata_csv()
-islet_metadata <- read.csv(islet_meta, header = TRUE)
+islet_metadata <- read_islet_metadata()
 
 lv_stats_all_vs_nd <- differentialLVActivity(
     islet_fullRes,
