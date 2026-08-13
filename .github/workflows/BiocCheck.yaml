@@ -1,0 +1,69 @@
+on:
+  push:
+    branches: [devel]
+  pull_request:
+
+name: BiocCheck.yaml
+
+permissions: read-all
+
+jobs:
+  BiocCheck:
+    runs-on: ubuntu-latest
+    name: BiocCheck
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v6
+
+      - name: Setup Pandoc
+        uses: r-lib/actions/setup-pandoc@v2
+
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: devel
+          http-user-agent: release
+          use-public-rspm: true
+
+      - name: Select Bioconductor devel
+        run: |
+          config <- readLines("https://bioconductor.org/config.yaml")
+          line <- grep("^devel_version:", config, value = TRUE)
+          stopifnot(length(line) == 1L)
+          version <- trimws(sub("^devel_version:", "", line))
+          version <- gsub('"', "", version, fixed = TRUE)
+          cat(
+            sprintf("R_BIOC_VERSION=%s\n", version),
+            file = Sys.getenv("GITHUB_ENV"), append = TRUE
+          )
+        shell: Rscript {0}
+
+      - name: Install Deps
+        uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          cache: always
+          extra-packages: |
+            bioc::BiocCheck
+          needs: check
+
+      - name: Run BiocCheck on git clone
+        run: |
+          BiocCheck::BiocCheckGitClone(
+            ".",
+            `quit-with-status` = TRUE
+          )
+        shell: Rscript {0}
+
+      - name: Build tarball
+        run: R CMD build --no-manual .
+
+      - name: Run BiocCheck on tarball
+        run: |
+          tarball <- list.files(pattern = "^CLAMP_.*\\.tar\\.gz$")[1]
+          BiocCheck::BiocCheck(
+            tarball,
+            `new-package` = FALSE,
+            `quit-with-status` = TRUE
+          )
+        shell: Rscript {0}
