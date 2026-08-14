@@ -898,20 +898,24 @@ select_clamp_k(
 # Visualization
 
 CLAMP provides dedicated plotting functions built on **ggplot2**, prefixed
-`CLAMPplot` or `CLAMPdotplot`.  The examples below use the whole-blood result
-`wb_fullRes` computed in Example 1.
+`CLAMPplot` or `CLAMPdotplot`. The heatmap and gene-loading plots use the
+whole-blood result `wb_fullRes` computed in Example 1. The pathway dot plots use
+the Alzheimer's result `alz_fullRes`, which contains associations passing the
+displayed AUC and FDR thresholds.
 
 ## Pathway–LV association heatmap (`CLAMPplotU`)
 
 `CLAMPplotU` displays the pathway loading matrix **U** after filtering by AUC
 and FDR.  Only the top-`top` pathways per LV are shown, making it easy to
-scan which pathways drive each latent variable.
+scan which pathways drive each latent variable. This overview uses permissive
+cutoffs so it remains populated across reproducible vignette builds; use more
+selective cutoffs for an analysis-specific figure.
 
 ```{r plot-U, message=FALSE, fig.width=14, fig.height=10}
 CLAMPplotU(
     wb_fullRes,
-    auc.cutoff = 0.6,
-    fdr.cutoff = 0.05,
+    auc.cutoff = 0,
+    fdr.cutoff = 1,
     top        = 3
 )
 ```
@@ -937,8 +941,9 @@ CLAMPplotTopZ(
 ```
 
 Only one LV:
+
 ```{r plot-topZ1, message=FALSE, fig.width=5, fig.height=3}
-# Use the first few LVs that have pathway support
+# Use the first LV that has pathway support
 lv_with_paths <- wb_fullRes$withPrior[1]
 
 CLAMPplotTopZ(
@@ -948,6 +953,7 @@ CLAMPplotTopZ(
     index     = lv_with_paths
 )
 ```
+
 ## Single-LV pathway dot plot (`CLAMPdotplot`)
 
 `CLAMPdotplot` shows the top pathways for one selected LV as a lollipop chart.
@@ -959,11 +965,11 @@ Plot order by AUC:
 
 ```{r plot-dot, message=FALSE, fig.width=7, fig.height=4, out.width='100%'}
 CLAMPdotplot(
-    wb_fullRes,
-    lv         = "LV2",
+    alz_fullRes,
+    lv         = "LV3",
     top        = 15,
-    auc.cutoff = 0.6,
-    fdr.cutoff = 0.1,
+    auc.cutoff = 0.65,
+    fdr.cutoff = 0.05,
     x.axis     = "AUC",
     order.by   = "AUC"
 )
@@ -973,11 +979,11 @@ Plot order by FDR:
 
 ```{r plot-dot-fdr, message=FALSE, fig.width=7, fig.height=4, out.width='100%'}
 CLAMPdotplot(
-    wb_fullRes,
-    lv         = "LV2",
+    alz_fullRes,
+    lv         = "LV3",
     top        = 15,
-    auc.cutoff = 0.6,
-    fdr.cutoff = 0.1,
+    auc.cutoff = 0.65,
+    fdr.cutoff = 0.05,
     x.axis     = "-log10(FDR)",
     order.by   = "-log10(FDR)"
 )
@@ -991,7 +997,7 @@ encodes `-log10(FDR)`.
 
 ```{r plot-dotAll, message=FALSE, fig.width=10, fig.height=7.5, out.width='100%'}
 CLAMPdotplotAll(
-    wb_fullRes,
+    alz_fullRes,
     auc.cutoff = 0.65,
     fdr.cutoff = 0.05,
     top.per.lv = 5

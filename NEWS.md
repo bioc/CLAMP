@@ -1,3 +1,9 @@
+# CLAMP 0.99.6
+
+## Bug fixes
+- Corrected the pathway dot-plot heading and Visualization examples in the
+  introductory vignette so all six plots are rendered.
+
 # CLAMP 0.99.5
 
 ## Improvements
