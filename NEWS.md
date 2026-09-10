@@ -1,3 +1,14 @@
+# CLAMP 0.99.7
+
+## Improvements
+- Added `log2_transform = TRUE` to `preprocessCLAMP()`,
+  `preprocessCLAMPFBM()`, and `cleanFBM()`. Set it to `FALSE` to skip
+  log2 transformation while retaining missing-value handling and filtering.
+
+## Bug fixes
+- Changed `preprocessCLAMP()` to use population variance, matching
+  `preprocessCLAMPFBM()` for variance filtering and downstream scaling.
+
 # CLAMP 0.99.6
 
 ## Bug fixes

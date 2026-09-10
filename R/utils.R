@@ -413,12 +413,16 @@ commonRows <- function(data1, data2) {
 #'
 #' This function inspects an FBM to determine if log-transformation is needed
 #' (based on value range) and whether NA values are present. If the maximum
-#' value is >= 100, it applies a log2(x + 1) transformation in-place. If any
+#' value is >= 100 and `log2_transform = TRUE`, it applies a log2(x + 1)
+#' transformation in-place. If any
 #' NA values are detected, they are replaced with 0.
 #'
 #' @param fbm A `bigmemory::FBM` or `bigstatsr::FBM` object.
 #' @param ncores Integer; number of cores to use for parallel operations
 #'   (default 1).
+#' @param log2_transform Logical; enable automatic `log2(x + 1)` transformation
+#'   when the maximum value is at least 100 (default TRUE). Set to FALSE to
+#'   skip transformation. Missing values are still replaced with zero.
 #' @return A list with:
 #'   \describe{
 #'     \item{max_value}{The maximum value encountered in the FBM (after log
@@ -439,7 +443,8 @@ commonRows <- function(data1, data2) {
 #' cleanFBM(fbm, ncores = 1)
 #'
 #' @export
-cleanFBM <- function(fbm, ncores = 1) {
+cleanFBM <- function(fbm, ncores = 1, log2_transform = TRUE) {
+    .assert_flag(log2_transform)
     .assert_positive_count(ncores)
     if (!inherits(fbm, "FBM")) {
         stop("`fbm` must be a bigstatsr::FBM object.", call. = FALSE)
@@ -461,12 +466,14 @@ cleanFBM <- function(fbm, ncores = 1) {
     has_na <- stats$na
 
     # Log2 transform if necessary
-    if (!is.na(max_value) && max_value >= 100) {
+    if (log2_transform && !is.na(max_value) && max_value >= 100) {
         message("Applying log2 transformation")
         big_apply(fbm, a.FUN = function(X, ind) {
             X[, ind] <- log2(X[, ind] + 1)
             NULL
         }, ind = bigstatsr::cols_along(fbm), ncores = ncores, )
+    } else if (!log2_transform) {
+        message("Skipping log2 transformation")
     } else {
         message("Already on log scale or all NA")
     }
@@ -697,6 +704,9 @@ zscoreCLAMP <- function(Y_filtered, rowStats) {
 #'   (default 1).
 #' @param block_size Number of rows to process at a time when copying data.
 #'   Default is 1000.
+#' @param log2_transform Logical; enable automatic `log2(x + 1)` transformation
+#'   when the maximum value is at least 100 (default TRUE). Set to FALSE to
+#'   skip transformation. Missing values are still replaced with zero.
 #' @return A list with:
 #'   \item{fbm_filtered}{The filtered FBM (writable).}
 #'   \item{rowStats}{List with row_means & row_variances for fbm_filtered.}
@@ -721,8 +731,9 @@ zscoreCLAMP <- function(Y_filtered, rowStats) {
 #' @export
 preprocessCLAMPFBM <- function(
     fbm, mean_cutoff = NULL, var_cutoff = NULL, backingfile = NULL,
-    block_size = 1000, ncores = 1
+    block_size = 1000, ncores = 1, log2_transform = TRUE
 ) {
+    .assert_flag(log2_transform)
     if (!is.null(mean_cutoff)) .assert_numeric_scalar(mean_cutoff)
     if (!is.null(var_cutoff)) .assert_numeric_scalar(var_cutoff)
     .assert_positive_count(block_size)
@@ -763,7 +774,7 @@ preprocessCLAMPFBM <- function(
     }
 
     # Clean in-place (log2 if needed, fill NAs)
-    cleanFBM(fbm_copy, ncores)
+    cleanFBM(fbm_copy, ncores = ncores, log2_transform = log2_transform)
 
     # Compute row stats on cleaned copy
     rs_all <- computeRowStatsFBM(fbm_copy, ncores)
@@ -872,13 +883,20 @@ zscoreCLAMPFBM <- function(fbm_filtered, rowStats,
 #' Cleans an expression matrix, filters genes by mean expression and variance,
 #' and returns the filtered matrix and per-gene statistics. To match
 #' [preprocessCLAMPFBM()], values are transformed with `log2(Y + 1)` when the
-#' maximum value is at least 100, and missing values are replaced with zero.
+#' maximum value is at least 100 and `log2_transform = TRUE`. Missing values
+#' are replaced with zero regardless of `log2_transform`. Row variances use
+#' population variance (dividing by the number of samples), matching
+#' [preprocessCLAMPFBM()].
 #'
 #' @param Y Numeric matrix of gene expression (rows = genes, cols = samples)
 #' @param mean_cutoff Numeric. Minimum row-mean required to keep a gene
 #'   (default 0).
 #' @param var_cutoff  Numeric. Minimum row-variance required to keep a gene
 #'   (default 0).
+#'
+#' @param log2_transform Logical; enable automatic `log2(x + 1)` transformation
+#'   when the maximum value is at least 100 (default TRUE). Set to FALSE to
+#'   skip transformation. Missing values are still replaced with zero.
 #'
 #' @return A list with components:
 #'   - Y_filtered: filtered matrix (genes x samples)
@@ -901,7 +919,9 @@ zscoreCLAMPFBM <- function(fbm_filtered, rowStats,
 #' # keep genes with mean >= 6 and variance >= 2
 #' res <- preprocessCLAMP(mat, mean_cutoff = 6, var_cutoff = 2)
 #' @export
-preprocessCLAMP <- function(Y, mean_cutoff = 0, var_cutoff = 0) {
+preprocessCLAMP <- function(Y, mean_cutoff = 0, var_cutoff = 0,
+                            log2_transform = TRUE) {
+    .assert_flag(log2_transform)
     .assert_numeric_scalar(mean_cutoff)
     .assert_numeric_scalar(var_cutoff)
     if (!is.matrix(Y) || !is.numeric(Y)) {
@@ -909,9 +929,11 @@ preprocessCLAMP <- function(Y, mean_cutoff = 0, var_cutoff = 0) {
     }
 
     max_value <- if (all(is.na(Y))) NA_real_ else max(Y, na.rm = TRUE)
-    if (!is.na(max_value) && max_value >= 100) {
+    if (log2_transform && !is.na(max_value) && max_value >= 100) {
         message("Applying log2 transformation")
         Y <- log2(Y + 1)
+    } else if (!log2_transform) {
+        message("Skipping log2 transformation")
     } else {
         message("Already on log scale or all NA")
     }
@@ -925,7 +947,7 @@ preprocessCLAMP <- function(Y, mean_cutoff = 0, var_cutoff = 0) {
 
     # Compute per‐gene statistics
     row_mean <- rowMeans(Y, na.rm = TRUE)
-    row_var <- apply(Y, 1, stats::var, na.rm = TRUE)
+    row_var <- rowMeans(Y^2) - row_mean^2
 
     rowStats <- data.frame(
         mean = row_mean, variance = row_var,

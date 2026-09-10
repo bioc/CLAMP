@@ -10,7 +10,8 @@ preprocessCLAMPFBM(
   var_cutoff = NULL,
   backingfile = NULL,
   block_size = 1000,
-  ncores = 1
+  ncores = 1,
+  log2_transform = TRUE
 )
 }
 \arguments{
@@ -31,6 +32,10 @@ Default is 1000.}
 
 \item{ncores}{Integer; number of cores to use for parallel operations
 (default 1).}
+
+\item{log2_transform}{Logical; enable automatic \code{log2(x + 1)} transformation
+when the maximum value is at least 100 (default TRUE). Set to FALSE to
+skip transformation. Missing values are still replaced with zero.}
 }
 \value{
 A list with:

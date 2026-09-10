@@ -4,7 +4,7 @@
 \alias{preprocessCLAMP}
 \title{Preprocess an expression matrix for CLAMP}
 \usage{
-preprocessCLAMP(Y, mean_cutoff = 0, var_cutoff = 0)
+preprocessCLAMP(Y, mean_cutoff = 0, var_cutoff = 0, log2_transform = TRUE)
 }
 \arguments{
 \item{Y}{Numeric matrix of gene expression (rows = genes, cols = samples)}
@@ -14,6 +14,10 @@ preprocessCLAMP(Y, mean_cutoff = 0, var_cutoff = 0)
 
 \item{var_cutoff}{Numeric. Minimum row-variance required to keep a gene
 (default 0).}
+
+\item{log2_transform}{Logical; enable automatic \code{log2(x + 1)} transformation
+when the maximum value is at least 100 (default TRUE). Set to FALSE to
+skip transformation. Missing values are still replaced with zero.}
 }
 \value{
 A list with components:
@@ -27,7 +31,10 @@ A list with components:
 Cleans an expression matrix, filters genes by mean expression and variance,
 and returns the filtered matrix and per-gene statistics. To match
 \code{\link[=preprocessCLAMPFBM]{preprocessCLAMPFBM()}}, values are transformed with \code{log2(Y + 1)} when the
-maximum value is at least 100, and missing values are replaced with zero.
+maximum value is at least 100 and \code{log2_transform = TRUE}. Missing values
+are replaced with zero regardless of \code{log2_transform}. Row variances use
+population variance (dividing by the number of samples), matching
+\code{\link[=preprocessCLAMPFBM]{preprocessCLAMPFBM()}}.
 }
 \examples{
 # construct a small example matrix
