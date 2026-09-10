@@ -1,3 +1,11 @@
+# CLAMP 0.99.8
+
+## Bug fixes
+- Fixed whole-blood examples in the introductory vignette and README to
+  use the supplied normalized expression values directly, avoiding redundant
+  CPM normalization and log2 transformation that caused the pkgdown build
+  to fail during `CLAMPfull()`.
+
 # CLAMP 0.99.7
 
 ## Improvements

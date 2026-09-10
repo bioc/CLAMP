@@ -258,18 +258,18 @@ dataWholeBlood[1:6, 1:6] # genes x samples
 
 ## Preprocess and z-score
 
-We first CPM-normalize the data (when needed), filter for genes with mean 
-expression ≥ 0.5 and variance ≥ 0.1, and then apply z-score normalization.
+The bundled whole-blood matrix already contains normalized expression values.
+We use these values directly, disable log2 transformation, filter for genes
+with mean expression ≥ 0.5 and variance ≥ 0.1, and then apply z-score
+normalization. CPM normalization is appropriate for raw counts.
 
 ```{r preprocess, message=TRUE}
-#  CPM normalization
-dataWholeBlood_cpm <- cpmCLAMP(dataWholeBlood)
-
-# Filter and compute row statistics
+# Filter the normalized expression values and compute row statistics
 prep_wb <- preprocessCLAMP(
-    Y = dataWholeBlood_cpm,
+    Y = dataWholeBlood,
     mean_cutoff = 0.5,
-    var_cutoff = 0.1
+    var_cutoff = 0.1,
+    log2_transform = FALSE
 )
 
 # Extract filtered matrix and rowStats
