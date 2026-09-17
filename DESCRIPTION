@@ -1,7 +1,7 @@
 Package: CLAMP
 Type: Package
 Title: Curated Latent-variable Analysis with Molecular Priors
-Version: 0.99.8
+Version: 0.99.9
 Authors@R:
     c(
       person("Marc", "Subirana-Granes", role = c("aut","cre"),
@@ -9,6 +9,8 @@ Authors@R:
              comment = c(ORCID = "0000-0003-3934-839X")),
       person("Maria", "Chikina", role = "aut",
              email = "mchikina@gmail.com"),
+      person("Alexander", "McKim", role = "ctb",
+             email = "alexander.mckim@cuanschutz.edu"),
       person("National Human Genome Research Institute", role = "fnd",
              comment = "R00 HG011898 to M.P.; R01 HG009299-6A1 to M.C."),
       person("Eunice Kennedy Shriver National Institute of Child Health and Human Development",
