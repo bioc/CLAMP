@@ -13,23 +13,26 @@
 |      Branch      |    R CMD check   | Last updated |
 |:----------------:|:----------------:|:------------:|
 | [_devel_](https://bioconductor.org/packages/devel/bioc/html/CLAMP.html) | [![Bioconductor-devel Build Status](https://bioconductor.org/shields/build/devel/bioc/CLAMP.svg)](https://bioconductor.org/checkResults/devel/bioc-LATEST/CLAMP) | ![Bioconductor-devel last commit](https://bioconductor.org/shields/lastcommit/devel/bioc/CLAMP.svg) |
-| [_release_](https://bioconductor.org/packages/release/bioc/html/CLAMP.html) | [![Bioconductor-release Build Status](https://bioconductor.org/shields/build/release/bioc/CLAMP.svg)](https://bioconductor.org/checkResults/release/bioc-LATEST/CLAMP) | ![Bioconductor-release last commit](https://bioconductor.org/shields/lastcommit/release/bioc/CLAMP.svg) |
+| _release_ | Not yet released | — |
 
 The goal of CLAMP (**C**urated **L**atent-variable **A**nalysis with **M**olecular **P**riors) is to provide an easy-to-use package to extract interpretable latent variables from large transcriptomic datasets using biological priors.
 
 ## Installation
 
-You can install the latest release of `CLAMP` from Bioconductor:
+`CLAMP` is available in the [development branch of Bioconductor](https://bioconductor.org/packages/devel/bioc/html/CLAMP.html) and has not yet entered a Bioconductor release. It requires R >= 4.6.0 and an R version compatible with Bioconductor devel (see the [Bioconductor installation guide](https://bioconductor.org/install/)).
+
+To install from Bioconductor devel, first switch your R library to the development version of Bioconductor:
 
 ``` r
 if (!requireNamespace("BiocManager", quietly = TRUE)) {
     install.packages("BiocManager")
 }
 
+BiocManager::install(version = "devel")
 BiocManager::install("CLAMP")
 ```
 
-If you want to test the development version, you can install it from the github repository:
+Alternatively, with Bioconductor devel configured, you can install the latest source from GitHub:
 
 ``` r
 BiocManager::install("chikinalab/CLAMP")

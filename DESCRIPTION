@@ -1,7 +1,7 @@
 Package: CLAMP
 Type: Package
 Title: Curated Latent-variable Analysis with Molecular Priors
-Version: 0.99.10
+Version: 0.99.11
 Authors@R:
     c(
       person("Marc", "Subirana-Granes", role = c("aut","cre"),
@@ -31,7 +31,7 @@ Description: CLAMP performs prior-informed latent variable decomposition of
     to uncover biologically meaningful patterns that connect genes, pathways,
     and complex traits in transcriptomics studies.
 License: GPL-3
-URL: https://chikinalab.github.io/CLAMP/, https://github.com/chikinalab/CLAMP
+URL: https://chikinalab.github.io/CLAMP/
 BugReports: https://github.com/chikinalab/CLAMP/issues
 Depends:
     R (>= 4.6.0),
